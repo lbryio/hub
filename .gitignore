@@ -1,0 +1,13 @@
+/.idea
+/.DS_Store
+/build
+/dist
+/.tox
+/.coverage*
+/venv
+scribe.egg-info
+__pycache__
+/tests/.coverage.*
+/.vscode
+/.gitignore
+.*pyc
