@@ -11,13 +11,11 @@ from functools import partial, lru_cache
 from numbers import Number
 from asyncio import Queue
 from scribe.common import RPCError, CodeMessageError
-from scribe import PROMETHEUS_NAMESPACE
 
 
 HISTOGRAM_BUCKETS = (
     .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
 )
-NAMESPACE = "scribe"
 
 
 SignatureInfo = namedtuple('SignatureInfo', 'min_args max_args '
