@@ -29,7 +29,7 @@ setup(
         ],
     },
     install_requires=[
-        'aiohttp==3.5.4',
+        'aiohttp==3.6.2',
         'certifi>=2018.11.29',
         # 'colorama==0.3.7',
         # 'distro==1.4.0',
@@ -48,7 +48,7 @@ setup(
         'elasticsearch==7.10.1',
         'hachoir',
         'filetype==1.0.9',
-        'grpcio==1.38.0'
+        'grpcio==1.38.0',
         'lbry-rocksdb==0.8.2'
     ],
     extras_require={
