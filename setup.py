@@ -46,8 +46,10 @@ setup(
         'pbkdf2==1.3',
         'attrs==18.2.0',
         'elasticsearch==7.10.1',
-        'lbry-rocksdb==0.8.2',
-        'uvloop'
+        'hachoir',
+        'filetype==1.0.9',
+        'grpcio==1.38.0'
+        'lbry-rocksdb==0.8.2'
     ],
     extras_require={
         'lint': ['pylint==2.10.0'],
