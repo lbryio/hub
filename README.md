@@ -3,10 +3,10 @@ Scribe maintains a rocksdb database containing the [LBRY blockchain](https://git
  * Uses Python 3.7-3.8
  * Protobuf schema for encoding and decoding metadata stored on the blockchain ([scribe.schema](https://github.com/lbryio/scribe/tree/master/scribe/schema)).
  * Blockchain processor that maintains an up to date rocksdb database ([scribe.blockchain](https://github.com/lbryio/scribe/tree/master/scribe/blockchain))
- * Rocksdb based database containing the blockchain data ([scribe.db]((https://github.com/lbryio/scribe/tree/master/scribe/db)))
- * Interface for python services to implement in order for them maintain a read only view of the blockchain data ([scribe.readers.interface]((https://github.com/lbryio/scribe/tree/master/scribe/db)))
- * Electrum based server for thin-wallet clients like lbry-sdk ([scribe.readers.hub_server]((https://github.com/lbryio/scribe/tree/master/scribe/db)))
- * Elasticsearch sync utility to index all the claim metadata in the blockchain into an easily searchable form ([scribe.readers.elastic_sync]((https://github.com/lbryio/scribe/tree/master/scribe/db)))
+ * Rocksdb based database containing the blockchain data ([scribe.db](https://github.com/lbryio/scribe/tree/master/scribe/db))
+ * Interface for python services to implement in order for them maintain a read only view of the blockchain data ([scribe.readers.interface](https://github.com/lbryio/scribe/tree/master/scribe/db))
+ * Electrum based server for thin-wallet clients like lbry-sdk ([scribe.readers.hub_server](https://github.com/lbryio/scribe/tree/master/scribe/db))
+ * Elasticsearch sync utility to index all the claim metadata in the blockchain into an easily searchable form ([scribe.readers.elastic_sync](https://github.com/lbryio/scribe/tree/master/scribe/db))
 
 
 ## Installation
