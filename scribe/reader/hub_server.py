@@ -1,14 +1,10 @@
-import signal
 import asyncio
-import typing
-from scribe import __version__
 from scribe.blockchain.daemon import LBCDaemon
 from scribe.reader import BaseBlockchainReader
 from scribe.elasticsearch import ElasticNotifierClientProtocol
 from scribe.hub.session import SessionManager
 from scribe.hub.mempool import MemPool
 from scribe.hub.udp import StatusServer
-from scribe.hub.prometheus import PrometheusServer
 
 
 class BlockchainReaderServer(BaseBlockchainReader):
@@ -21,7 +17,6 @@ class BlockchainReaderServer(BaseBlockchainReader):
         self.mempool_notifications = set()
         self.status_server = StatusServer()
         self.daemon = LBCDaemon(env.coin, env.daemon_url)  # only needed for broadcasting txs
-        self.prometheus_server: typing.Optional[PrometheusServer] = None
         self.mempool = MemPool(self.env.coin, self.db)
         self.session_manager = SessionManager(
             env, self.db, self.mempool, self.history_cache, self.resolve_cache,
@@ -32,7 +27,9 @@ class BlockchainReaderServer(BaseBlockchainReader):
         )
         self.mempool.session_manager = self.session_manager
         self.es_notifications = asyncio.Queue()
-        self.es_notification_client = ElasticNotifierClientProtocol(self.es_notifications)
+        self.es_notification_client = ElasticNotifierClientProtocol(
+            self.es_notifications, '127.0.0.1', self.env.elastic_notifier_port
+        )
         self.synchronized = asyncio.Event()
         self._es_height = None
         self._es_block_hash = None
@@ -75,9 +72,6 @@ class BlockchainReaderServer(BaseBlockchainReader):
         self.notifications_to_send.clear()
 
     async def receive_es_notifications(self, synchronized: asyncio.Event):
-        await asyncio.get_event_loop().create_connection(
-            lambda: self.es_notification_client, '127.0.0.1', self.env.elastic_notifier_port
-        )
         synchronized.set()
         try:
             while True:
@@ -92,71 +86,23 @@ class BlockchainReaderServer(BaseBlockchainReader):
         finally:
             self.es_notification_client.close()
 
-    async def start(self):
-        await super().start()
-        env = self.env
-        # min_str, max_str = env.coin.SESSIONCLS.protocol_min_max_strings()
-        self.log.info(f'software version: {__version__}')
-        # self.log.info(f'supported protocol versions: {min_str}-{max_str}')
-        self.log.info(f'event loop policy: {env.loop_policy}')
-        self.log.info(f'reorg limit is {env.reorg_limit:,d} blocks')
-        await self.daemon.height()
-
-        def _start_cancellable(run, *args):
-            _flag = asyncio.Event()
-            self.cancellable_tasks.append(asyncio.ensure_future(run(*args, _flag)))
-            return _flag.wait()
-
-        self.db.open_db()
-        await self.db.initialize_caches()
-
-        self.last_state = self.db.read_db_state()
-
-        await self.start_prometheus()
+    async def start_status_server(self):
         if self.env.udp_port and int(self.env.udp_port):
             await self.status_server.start(
                 0, bytes.fromhex(self.env.coin.GENESIS_HASH)[::-1], self.env.country,
                 self.env.host, self.env.udp_port, self.env.allow_lan_udp
             )
-        await _start_cancellable(self.receive_es_notifications)
-        await _start_cancellable(self.refresh_blocks_forever)
-        await self.session_manager.search_index.start()
-        await _start_cancellable(self.session_manager.serve, self.mempool)
 
-    async def stop(self):
-        await self.status_server.stop()
-        async with self._lock:
-            while self.cancellable_tasks:
-                t = self.cancellable_tasks.pop()
-                if not t.done():
-                    t.cancel()
-        await self.session_manager.search_index.stop()
-        self.db.close()
-        if self.prometheus_server:
-            await self.prometheus_server.stop()
-            self.prometheus_server = None
-        await self.daemon.close()
-        self._executor.shutdown(wait=True)
-        self._executor = None
-        self.shutdown_event.set()
+    def _iter_start_tasks(self):
+        yield self.start_status_server()
+        yield self._start_cancellable(self.es_notification_client.maintain_connection)
+        yield self._start_cancellable(self.receive_es_notifications)
+        yield self._start_cancellable(self.refresh_blocks_forever)
+        yield self.session_manager.search_index.start()
+        yield self._start_cancellable(self.session_manager.serve, self.mempool)
 
-    def run(self):
-        loop = asyncio.get_event_loop()
-        loop.set_default_executor(self._executor)
-
-        def __exit():
-            raise SystemExit()
-        try:
-            loop.add_signal_handler(signal.SIGINT, __exit)
-            loop.add_signal_handler(signal.SIGTERM, __exit)
-            loop.run_until_complete(self.start())
-            loop.run_until_complete(self.shutdown_event.wait())
-        except (SystemExit, KeyboardInterrupt):
-            pass
-        finally:
-            loop.run_until_complete(self.stop())
-
-    async def start_prometheus(self):
-        if not self.prometheus_server and self.env.prometheus_port:
-            self.prometheus_server = PrometheusServer()
-            await self.prometheus_server.start("0.0.0.0", self.env.prometheus_port)
+    def _iter_stop_tasks(self):
+        yield self.status_server.stop()
+        yield self._stop_cancellable_tasks()
+        yield self.session_manager.search_index.stop()
+        yield self.daemon.close()

@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from prometheus_client import Histogram
 from scribe import PROMETHEUS_NAMESPACE
+from scribe.common import HISTOGRAM_BUCKETS
 from scribe.blockchain.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
@@ -32,9 +33,6 @@ class MemPoolTxSummary:
 
 
 NAMESPACE = f"{PROMETHEUS_NAMESPACE}_hub"
-HISTOGRAM_BUCKETS = (
-    .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
-)
 mempool_process_time_metric = Histogram(
     "processed_mempool", "Time to process mempool and notify touched addresses",
     namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS

@@ -3,7 +3,6 @@ import time
 import asyncio
 import typing
 import signal
-
 from bisect import bisect_right
 from struct import pack
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -11,18 +10,15 @@ from typing import Optional, List, Tuple, Set, DefaultDict, Dict
 from prometheus_client import Gauge, Histogram
 from collections import defaultdict
 
-from scribe.schema.url import normalize_name
-
 from scribe import __version__, PROMETHEUS_NAMESPACE
-from scribe.blockchain.daemon import LBCDaemon
-from scribe.blockchain.transaction import Tx, TxOutput, TxInput
 from scribe.db.db import HubDB
 from scribe.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from scribe.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
-from scribe.common import hash_to_hex_str, hash160, RPCError
+from scribe.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS
+from scribe.blockchain.daemon import LBCDaemon
+from scribe.blockchain.transaction import Tx, TxOutput, TxInput
 from scribe.blockchain.prefetcher import Prefetcher
-
-
+from scribe.schema.url import normalize_name
 if typing.TYPE_CHECKING:
     from scribe.env import Env
     from scribe.db.revertable import RevertableOpStack
@@ -55,11 +51,6 @@ class StagedClaimtrieItem(typing.NamedTuple):
             self.name, self.normalized_name, self.claim_hash, self.amount, self.expiration_height, self.tx_num,
             self.position, self.root_tx_num, self.root_position, False, None, self.reposted_claim_hash
         )
-
-
-HISTOGRAM_BUCKETS = (
-    .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
-)
 
 
 NAMESPACE = f"{PROMETHEUS_NAMESPACE}_writer"

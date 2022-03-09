@@ -23,7 +23,7 @@ from scribe import __version__, PROTOCOL_MIN, PROTOCOL_MAX, PROMETHEUS_NAMESPACE
 from scribe.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from scribe.elasticsearch import SearchIndex
 from scribe.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
-from scribe.common import protocol_version, RPCError, DaemonError, TaskGroup
+from scribe.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS
 from scribe.hub.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
 from scribe.hub.common import BatchRequest, ProtocolError, Request, Batch, Notification
 from scribe.hub.framer import NewlineFramer
@@ -190,9 +190,6 @@ class SessionGroup:
 
 
 NAMESPACE = f"{PROMETHEUS_NAMESPACE}_hub"
-HISTOGRAM_BUCKETS = (
-    .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
-)
 
 
 class SessionManager:

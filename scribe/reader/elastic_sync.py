@@ -1,18 +1,13 @@
 import os
-import signal
 import json
 import typing
-import struct
-from collections import defaultdict
 import asyncio
 import logging
-from decimal import Decimal
+from collections import defaultdict
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch.helpers import async_streaming_bulk
-from prometheus_client import Gauge, Histogram
 
 from scribe.schema.result import Censor
-from scribe import PROMETHEUS_NAMESPACE
 from scribe.elasticsearch.notifier_protocol import ElasticNotifierProtocol
 from scribe.elasticsearch.search import IndexVersionMismatch, expand_query
 from scribe.elasticsearch.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
@@ -24,24 +19,9 @@ from scribe.db.common import TrendingNotification, DB_PREFIXES
 
 log = logging.getLogger(__name__)
 
-NAMESPACE = f"{PROMETHEUS_NAMESPACE}_elastic_sync"
-HISTOGRAM_BUCKETS = (
-    .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
-)
-
 
 class ElasticWriter(BaseBlockchainReader):
     VERSION = 1
-    prometheus_namespace = ""
-    block_count_metric = Gauge(
-        "block_count", "Number of processed blocks", namespace=NAMESPACE
-    )
-    block_update_time_metric = Histogram(
-        "block_time", "Block update times", namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
-    )
-    reorg_count_metric = Gauge(
-        "reorg_count", "Number of reorgs", namespace=NAMESPACE
-    )
 
     def __init__(self, env):
         super().__init__(env, 'lbry-elastic-writer', thread_workers=1, thread_prefix='lbry-elastic-writer')
@@ -65,6 +45,7 @@ class ElasticWriter(BaseBlockchainReader):
         self._advanced = True
         self.synchronized = asyncio.Event()
         self._listeners: typing.List[ElasticNotifierProtocol] = []
+        self._force_reindex = False
 
     async def run_es_notifier(self, synchronized: asyncio.Event):
         server = await asyncio.get_event_loop().create_server(
@@ -138,8 +119,10 @@ class ElasticWriter(BaseBlockchainReader):
             await self.sync_client.indices.refresh(self.index)
             return False
 
-    async def stop_index(self):
+    async def stop_index(self, delete=False):
         if self.sync_client:
+            if delete:
+                await self.delete_index()
             await self.sync_client.close()
         self.sync_client = None
 
@@ -311,60 +294,30 @@ class ElasticWriter(BaseBlockchainReader):
     def last_synced_height(self) -> int:
         return self._last_wrote_height
 
-    async def start(self, reindex=False):
-        await super().start()
-
-        def _start_cancellable(run, *args):
-            _flag = asyncio.Event()
-            self.cancellable_tasks.append(asyncio.ensure_future(run(*args, _flag)))
-            return _flag.wait()
-
-        self.db.open_db()
-        await self.db.initialize_caches()
-        await self.read_es_height()
-        await self.start_index()
-        self.last_state = self.db.read_db_state()
-
-        await _start_cancellable(self.run_es_notifier)
-
-        if reindex or self._last_wrote_height == 0 and self.db.db_height > 0:
+    async def reindex(self, force=False):
+        if force or self._last_wrote_height == 0 and self.db.db_height > 0:
             if self._last_wrote_height == 0:
                 self.log.info("running initial ES indexing of rocksdb at block height %i", self.db.db_height)
             else:
                 self.log.info("reindex (last wrote: %i, db height: %i)", self._last_wrote_height, self.db.db_height)
-            await self.reindex()
-        await _start_cancellable(self.refresh_blocks_forever)
+            await self._reindex()
 
-    async def stop(self, delete_index=False):
-        async with self._lock:
-            while self.cancellable_tasks:
-                t = self.cancellable_tasks.pop()
-                if not t.done():
-                    t.cancel()
-        if delete_index:
-            await self.delete_index()
-        await self.stop_index()
-        self._executor.shutdown(wait=True)
-        self._executor = None
-        self.shutdown_event.set()
+    def _iter_start_tasks(self):
+        yield self.read_es_height()
+        yield self.start_index()
+        yield self._start_cancellable(self.run_es_notifier)
+        yield self.reindex(force=self._force_reindex)
+        yield self._start_cancellable(self.refresh_blocks_forever)
+
+    def _iter_stop_tasks(self):
+        yield self._stop_cancellable_tasks()
+        yield self.stop_index()
 
     def run(self, reindex=False):
-        loop = asyncio.get_event_loop()
-        loop.set_default_executor(self._executor)
+        self._force_reindex = reindex
+        return super().run()
 
-        def __exit():
-            raise SystemExit()
-        try:
-            loop.add_signal_handler(signal.SIGINT, __exit)
-            loop.add_signal_handler(signal.SIGTERM, __exit)
-            loop.run_until_complete(self.start(reindex=reindex))
-            loop.run_until_complete(self.shutdown_event.wait())
-        except (SystemExit, KeyboardInterrupt):
-            pass
-        finally:
-            loop.run_until_complete(self.stop())
-
-    async def reindex(self):
+    async def _reindex(self):
         async with self._lock:
             self.log.info("reindexing %i claims (estimate)", self.db.prefix_db.claim_to_txo.estimate_num_keys())
             await self.delete_index()
