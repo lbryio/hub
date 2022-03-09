@@ -3,7 +3,7 @@ import traceback
 import argparse
 from scribe.env import Env
 from scribe.blockchain.block_processor import BlockProcessor
-from scribe.readers import BlockchainReaderServer, ElasticWriter
+from scribe.reader import BlockchainReaderServer, ElasticWriter
 
 
 def get_arg_parser(name):

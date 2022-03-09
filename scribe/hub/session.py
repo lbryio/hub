@@ -21,7 +21,6 @@ from scribe.base58 import Base58Error
 from scribe.error import ResolveCensoredError, TooManyClaimSearchParametersError
 from scribe import __version__, PROTOCOL_MIN, PROTOCOL_MAX, PROMETHEUS_NAMESPACE
 from scribe.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
-from scribe.db import HubDB
 from scribe.elasticsearch import SearchIndex
 from scribe.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
 from scribe.common import protocol_version, RPCError, DaemonError, TaskGroup
@@ -29,6 +28,7 @@ from scribe.hub.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, 
 from scribe.hub.common import BatchRequest, ProtocolError, Request, Batch, Notification
 from scribe.hub.framer import NewlineFramer
 if typing.TYPE_CHECKING:
+    from scribe.db import HubDB
     from scribe.env import Env
     from scribe.blockchain.daemon import LBCDaemon
     from scribe.hub.mempool import MemPool
@@ -249,7 +249,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: HubDB, mempool: 'MemPool', history_cache, resolve_cache, resolve_outputs_cache,
+    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'MemPool', history_cache, resolve_cache, resolve_outputs_cache,
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
@@ -1144,7 +1144,7 @@ class LBRYElectrumX(SessionBase):
         self.protocol_tuple = self.PROTOCOL_MIN
         self.protocol_string = None
         self.daemon = self.session_manager.daemon
-        self.db: HubDB = self.session_manager.db
+        self.db: 'HubDB' = self.session_manager.db
 
     @classmethod
     def protocol_min_max_strings(cls):

@@ -3,7 +3,7 @@ import asyncio
 import typing
 from scribe import __version__
 from scribe.blockchain.daemon import LBCDaemon
-from scribe.readers import BaseBlockchainReader
+from scribe.reader import BaseBlockchainReader
 from scribe.elasticsearch import ElasticNotifierClientProtocol
 from scribe.hub.session import SessionManager
 from scribe.hub.mempool import MemPool

@@ -17,7 +17,7 @@ from scribe.elasticsearch.notifier_protocol import ElasticNotifierProtocol
 from scribe.elasticsearch.search import IndexVersionMismatch, expand_query
 from scribe.elasticsearch.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
 from scribe.elasticsearch.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
-from scribe.readers import BaseBlockchainReader
+from scribe.reader import BaseBlockchainReader
 from scribe.db.revertable import RevertableOp
 from scribe.db.common import TrendingNotification, DB_PREFIXES
 
