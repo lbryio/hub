@@ -36,7 +36,6 @@ setup(
         'protobuf==3.17.2',
         'msgpack==0.6.1',
         'prometheus_client==0.7.1',
-        'pyyaml==5.3.1',
         'prometheus_client==0.7.1',
         'coincurve==15.0.0',
         'pbkdf2==1.3',
