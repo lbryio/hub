@@ -31,10 +31,7 @@ setup(
     install_requires=[
         'aiohttp==3.6.2',
         'certifi>=2018.11.29',
-        # 'colorama==0.3.7',
-        # 'distro==1.4.0',
-        'base58==1.0.0',
-        'cffi==1.13.2',
+        'colorama==0.3.7',
         'cryptography==2.5',
         'protobuf==3.17.2',
         'msgpack==0.6.1',
@@ -46,7 +43,7 @@ setup(
         'pbkdf2==1.3',
         'attrs==18.2.0',
         'elasticsearch==7.10.1',
-        'hachoir',
+        'hachoir==3.1.2',
         'filetype==1.0.9',
         'grpcio==1.38.0',
         'lbry-rocksdb==0.8.2'
