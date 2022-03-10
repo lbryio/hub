@@ -227,7 +227,7 @@ class SessionManager:
         port was given in the environment.
         """
         env = self.env
-        host = env.cs_host(for_rpc=False)
+        host = env.cs_host()
         if env.tcp_port is not None:
             await self._start_server('TCP', host, env.tcp_port)
         if env.ssl_port is not None:

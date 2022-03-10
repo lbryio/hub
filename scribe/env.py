@@ -30,7 +30,7 @@ class Env:
     class Error(Exception):
         pass
 
-    def __init__(self, db_dir=None, daemon_url=None, host=None, rpc_host=None, elastic_host=None,
+    def __init__(self, db_dir=None, daemon_url=None, host=None, elastic_host=None,
                  elastic_port=None, loop_policy=None, max_query_workers=None,
                  chain=None, es_index_prefix=None, cache_MB=None, reorg_limit=None, tcp_port=None,
                  udp_port=None, ssl_port=None, ssl_certfile=None, ssl_keyfile=None,
@@ -46,7 +46,6 @@ class Env:
         self.db_max_open_files = db_max_open_files
 
         self.host = host if host is not None else self.default('HOST', 'localhost')
-        self.rpc_host = rpc_host if rpc_host is not None else self.default('RPC_HOST', 'localhost')
         self.elastic_host = elastic_host if elastic_host is not None else self.default('ELASTIC_HOST', 'localhost')
         self.elastic_port = elastic_port if elastic_port is not None else self.integer('ELASTIC_PORT', 9200)
         self.elastic_notifier_port = elastic_notifier_port if elastic_notifier_port is not None else self.integer('ELASTIC_NOTIFIER_PORT', 19080)
@@ -181,7 +180,7 @@ class Env:
             return loop_policy
         raise cls.Error(f'unknown event loop policy "{policy_name}"')
 
-    def cs_host(self, *, for_rpc):
+    def cs_host(self):
         """Returns the 'host' argument to pass to asyncio's create_server
         call.  The result can be a single host name string, a list of
         host name strings, or an empty string to bind to all interfaces.
@@ -189,14 +188,10 @@ class Env:
         If rpc is True the host to use for the RPC server is returned.
         Otherwise the host to use for SSL/TCP servers is returned.
         """
-        host = self.rpc_host if for_rpc else self.host
+        host = self.host
         result = [part.strip() for part in host.split(',')]
         if len(result) == 1:
             result = result[0]
-        # An empty result indicates all interfaces, which we do not
-        # permitted for an RPC server.
-        if for_rpc and not result:
-            result = 'localhost'
         if result == 'localhost':
             # 'localhost' resolves to ::1 (ipv6) on many systems, which fails on default setup of
             # docker, using 127.0.0.1 instead forces ipv4
