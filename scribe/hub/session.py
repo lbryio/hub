@@ -885,7 +885,7 @@ class LBRYElectrumX(asyncio.Protocol):
             elif method == 'blockchain.relayfee':
                 coro = self.relayfee
             else:
-                raise ValueError
+                raise RPCError(JSONRPC.METHOD_NOT_FOUND, f'unknown method "{method}"')
         else:
             raise ValueError
         if isinstance(request.args, dict):
