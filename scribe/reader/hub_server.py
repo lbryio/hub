@@ -10,17 +10,13 @@ from scribe.hub.udp import StatusServer
 class BlockchainReaderServer(BaseBlockchainReader):
     def __init__(self, env):
         super().__init__(env, 'lbry-reader', thread_workers=max(1, env.max_query_workers), thread_prefix='hub-worker')
-        self.history_cache = {}
-        self.resolve_outputs_cache = {}
-        self.resolve_cache = {}
         self.notifications_to_send = []
         self.mempool_notifications = set()
         self.status_server = StatusServer()
         self.daemon = LBCDaemon(env.coin, env.daemon_url)  # only needed for broadcasting txs
         self.mempool = MemPool(self.env.coin, self.db)
         self.session_manager = SessionManager(
-            env, self.db, self.mempool, self.history_cache, self.resolve_cache,
-            self.resolve_outputs_cache, self.daemon,
+            env, self.db, self.mempool, self.daemon,
             self.shutdown_event,
             on_available_callback=self.status_server.set_available,
             on_unavailable_callback=self.status_server.set_unavailable
@@ -35,9 +31,7 @@ class BlockchainReaderServer(BaseBlockchainReader):
         self._es_block_hash = None
 
     def clear_caches(self):
-        self.history_cache.clear()
-        self.resolve_outputs_cache.clear()
-        self.resolve_cache.clear()
+        self.session_manager.clear_caches()
         # self.clear_search_cache()
         # self.mempool.notified_mempool_txs.clear()
 

@@ -168,7 +168,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'MemPool', history_cache, resolve_cache, resolve_outputs_cache,
+    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'MemPool',
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
@@ -187,9 +187,9 @@ class SessionManager:
         self.cur_group = SessionGroup(0)
         self.txs_sent = 0
         self.start_time = time.time()
-        self.history_cache = history_cache
-        self.resolve_cache = resolve_cache
-        self.resolve_outputs_cache = resolve_outputs_cache
+        self.history_cache = {}
+        self.resolve_outputs_cache = {}
+        self.resolve_cache = {}
         self.notified_height: typing.Optional[int] = None
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
@@ -202,6 +202,11 @@ class SessionManager:
             elastic_host=env.elastic_host, elastic_port=env.elastic_port
         )
         self.running = False
+
+    def clear_caches(self):
+        self.history_cache.clear()
+        self.resolve_outputs_cache.clear()
+        self.resolve_cache.clear()
 
     async def _start_server(self, kind, *args, **kw_args):
         loop = asyncio.get_event_loop()
