@@ -1,4 +1,4 @@
-Scribe maintains a rocksdb database containing the [LBRY blockchain](https://github.com/lbryio/lbrycrd) and provides an interface for python based services that utilize the blockchain data in an ongoing manner. Scribe includes implementations of this interface to provide an electrum server for thin-wallet clients (such as lbry-sdk) and to maintain an elasticsearch database of metadata for claims in the LBRY blockchain.
+Scribe maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the [LBRY blockchain](https://github.com/lbryio/lbrycrd) and provides an interface for python based services that utilize the blockchain data in an ongoing manner. Scribe includes implementations of this interface to provide an electrum server for thin-wallet clients (such as lbry-sdk) and to maintain an elasticsearch database of metadata for claims in the LBRY blockchain.
 
  * Uses Python 3.7-3.8
  * Protobuf schema for encoding and decoding metadata stored on the blockchain ([scribe.schema](https://github.com/lbryio/scribe/tree/master/scribe/schema)).
@@ -16,6 +16,15 @@ Prebuilt [docker images](https://hub.docker.com/r/lbry/scribe/latest-release) ar
 
 ## Usage
 
+Scribe needs either the [lbrycrd](https://github.com/lbryio/lbrycrd) or [lbcd](https://github.com/lbryio/lbrycrd) blockchain daemon to be running.
+
+As of block 1124663 (3/10/22) the size of the rocksdb database is 87GB and the size of the elasticsearch volume is 49GB.
+
+To start scribe, run the following (providing your own args)
+
+```
+scribe --db_dir /your/db/path --daemon_url rpcuser:rpcpass@localhost:9245
+```
 
 ## Running from source
 
