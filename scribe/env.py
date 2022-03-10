@@ -31,9 +31,9 @@ class Env:
         pass
 
     def __init__(self, db_dir=None, daemon_url=None, host=None, rpc_host=None, elastic_host=None,
-                 elastic_port=None, loop_policy=None, max_query_workers=None, websocket_host=None, websocket_port=None,
+                 elastic_port=None, loop_policy=None, max_query_workers=None,
                  chain=None, es_index_prefix=None, cache_MB=None, reorg_limit=None, tcp_port=None,
-                 udp_port=None, ssl_port=None, ssl_certfile=None, ssl_keyfile=None, rpc_port=None,
+                 udp_port=None, ssl_port=None, ssl_certfile=None, ssl_keyfile=None,
                  prometheus_port=None, max_subscriptions=None, banner_file=None, anon_logs=None, log_sessions=None,
                  allow_lan_udp=None, cache_all_tx_hashes=None, cache_all_claim_txos=None, country=None,
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
@@ -56,8 +56,6 @@ class Env:
         )
         self.obsolete(['UTXO_MB', 'HIST_MB', 'NETWORK'])
         self.max_query_workers = max_query_workers if max_query_workers is not None else self.integer('MAX_QUERY_WORKERS', 4)
-        self.websocket_host = websocket_host if websocket_host is not None else self.default('WEBSOCKET_HOST', self.host)
-        self.websocket_port = websocket_port if websocket_port is not None else self.integer('WEBSOCKET_PORT', None)
         if chain == 'mainnet':
             self.coin = LBCMainNet
         elif chain == 'testnet':
@@ -74,7 +72,6 @@ class Env:
         if self.ssl_port:
             self.ssl_certfile = ssl_certfile if ssl_certfile is not None else self.required('SSL_CERTFILE')
             self.ssl_keyfile = ssl_keyfile if ssl_keyfile is not None else self.required('SSL_KEYFILE')
-        self.rpc_port = rpc_port if rpc_port is not None else self.integer('RPC_PORT', 8000)
         self.prometheus_port = prometheus_port if prometheus_port is not None else self.integer('PROMETHEUS_PORT', 0)
         self.max_subscriptions = max_subscriptions if max_subscriptions is not None else self.integer('MAX_SUBSCRIPTIONS', 10000)
         self.banner_file = banner_file if banner_file is not None else self.default('BANNER_FILE', None)
@@ -307,14 +304,7 @@ class Env:
                             help='TCP port to listen on for hub server')
         parser.add_argument('--udp_port', type=int, default=cls.integer('UDP_PORT', 50001),
                             help='UDP port to listen on for hub server')
-        parser.add_argument('--rpc_host', default=cls.default('RPC_HOST', 'localhost'), type=str,
-                            help='Listening interface for admin rpc')
-        parser.add_argument('--rpc_port', default=cls.integer('RPC_PORT', 8000), type=int,
-                            help='Listening port for admin rpc')
-        parser.add_argument('--websocket_host', default=cls.default('WEBSOCKET_HOST', 'localhost'), type=str,
-                            help='Listening interface for websocket')
-        parser.add_argument('--websocket_port', default=cls.integer('WEBSOCKET_PORT', None), type=int,
-                            help='Listening port for websocket')
+
 
         parser.add_argument('--ssl_port', default=cls.integer('SSL_PORT', None), type=int,
                             help='SSL port to listen on for hub server')
@@ -376,12 +366,12 @@ class Env:
     def from_arg_parser(cls, args):
         return cls(
             db_dir=args.db_dir, daemon_url=args.daemon_url, db_max_open_files=args.db_max_open_files,
-            host=args.host, rpc_host=args.rpc_host, elastic_host=args.elastic_host, elastic_port=args.elastic_port,
-            loop_policy=args.loop_policy, max_query_workers=args.max_query_workers, websocket_host=args.websocket_host,
-            websocket_port=args.websocket_port, chain=args.chain, es_index_prefix=args.es_index_prefix,
+            host=args.host, elastic_host=args.elastic_host, elastic_port=args.elastic_port,
+            loop_policy=args.loop_policy, max_query_workers=args.max_query_workers,
+            chain=args.chain, es_index_prefix=args.es_index_prefix,
             cache_MB=args.cache_MB, reorg_limit=args.reorg_limit, tcp_port=args.tcp_port,
             udp_port=args.udp_port, ssl_port=args.ssl_port, ssl_certfile=args.ssl_certfile,
-            ssl_keyfile=args.ssl_keyfile, rpc_port=args.rpc_port, prometheus_port=args.prometheus_port,
+            ssl_keyfile=args.ssl_keyfile, prometheus_port=args.prometheus_port,
             max_subscriptions=args.max_subscriptions, banner_file=args.banner_file, anon_logs=args.anon_logs,
             log_sessions=None, allow_lan_udp=args.allow_lan_udp,
             cache_all_tx_hashes=args.cache_all_tx_hashes, cache_all_claim_txos=args.cache_all_claim_txos,
