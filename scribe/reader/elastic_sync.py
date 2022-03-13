@@ -220,7 +220,6 @@ class ElasticWriter(BaseBlockchainReader):
 
     def advance(self, height: int):
         super().advance(height)
-
         touched_or_deleted = self.db.prefix_db.touched_or_deleted.get(height)
         for k, v in self.db.prefix_db.trending_notification.iterate((height,)):
             self._trending[k.claim_hash].append(TrendingNotification(k.height, v.previous_amount, v.new_amount))
@@ -236,8 +235,8 @@ class ElasticWriter(BaseBlockchainReader):
         self._advanced = True
 
     def unwind(self):
-        self.db.tx_counts.pop()
-        reverted_block_hash = self.db.coin.header_hash(self.db.headers.pop())
+        reverted_block_hash = self.db.coin.header_hash(self.db.headers[-1])
+        super().unwind()
         packed = self.db.prefix_db.undo.get(len(self.db.tx_counts), reverted_block_hash)
         touched_or_deleted = None
         claims_to_delete = []

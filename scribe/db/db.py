@@ -766,7 +766,7 @@ class HubDB:
 
     async def _read_tx_hashes(self):
         def _read_tx_hashes():
-            return list(self.prefix_db.tx_hash.iterate(start=(0,), stop=(self.db_tx_count + 1), include_key=False, fill_cache=False, deserialize_value=False))
+            return list(self.prefix_db.tx_hash.iterate(start=(0,), stop=(self.db_tx_count + 1,), include_key=False, fill_cache=False, deserialize_value=False))
 
         self.logger.info("loading tx hashes")
         self.total_transactions.clear()

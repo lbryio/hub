@@ -141,12 +141,24 @@ class BaseBlockchainReader(BlockchainReaderInterface):
         tx_count = self.db.prefix_db.tx_count.get(height).tx_count
         assert tx_count not in self.db.tx_counts, f'boom {tx_count} in {len(self.db.tx_counts)} tx counts'
         assert len(self.db.tx_counts) == height, f"{len(self.db.tx_counts)} != {height}"
+        prev_count = self.db.tx_counts[-1]
         self.db.tx_counts.append(tx_count)
+        if self.db._cache_all_tx_hashes:
+            for tx_num in range(prev_count, tx_count):
+                tx_hash = self.db.prefix_db.tx_hash.get(tx_num).tx_hash
+                self.db.total_transactions.append(tx_hash)
+                self.db.tx_num_mapping[tx_hash] = tx_count
+            assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
         self.db.headers.append(self.db.prefix_db.header.get(height, deserialize_value=False))
 
     def unwind(self):
-        self.db.tx_counts.pop()
+        prev_count = self.db.tx_counts.pop()
+        tx_count = self.db.tx_counts[-1]
         self.db.headers.pop()
+        if self.db._cache_all_tx_hashes:
+            for _ in range(prev_count - tx_count):
+                self.db.tx_num_mapping.pop(self.db.total_transactions.pop())
+            assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
 
     def _start_cancellable(self, run, *args):
         _flag = asyncio.Event()
