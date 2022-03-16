@@ -1,6 +1,5 @@
 import base64
 from typing import List, TYPE_CHECKING, Union, Optional, NamedTuple
-from binascii import hexlify
 from itertools import chain
 
 from scribe.error import ResolveCensoredError
@@ -151,7 +150,7 @@ class Outputs:
         for txo_message in chain(outputs.txos, outputs.extra_txos):
             if txo_message.WhichOneof('meta') == 'error':
                 continue
-            txs.add((hexlify(txo_message.tx_hash[::-1]).decode(), txo_message.height))
+            txs.add((txo_message.tx_hash[::-1].hex(), txo_message.height))
         return cls(
             outputs.txos, outputs.extra_txos, txs,
             outputs.offset, outputs.total,
@@ -164,7 +163,7 @@ class Outputs:
         for txo_message in chain(outputs.txos, outputs.extra_txos):
             if txo_message.WhichOneof('meta') == 'error':
                 continue
-            txs.add((hexlify(txo_message.tx_hash[::-1]).decode(), txo_message.height))
+            txs.add((txo_message.tx_hash[::-1].hex(), txo_message.height))
         return cls(
             outputs.txos, outputs.extra_txos, txs,
             outputs.offset, outputs.total,
