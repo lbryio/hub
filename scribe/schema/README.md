@@ -1,11 +1,11 @@
 Schema
 =====
 
-Those files are generated from the [types repo](https://github.com/lbryio/types). If you are modifying/adding a new type, make sure it is cloned in the same root folder as the SDK repo, like:
+Those files are generated from the [types repo](https://github.com/lbryio/types). If you are modifying/adding a new type, make sure it is cloned in the same root folder as the scribe repo, like:
 
 ```
 repos/
-    - lbry-sdk/
+    - scribe/
     - types/
 ```
 
