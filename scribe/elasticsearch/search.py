@@ -10,7 +10,7 @@ from typing import Optional, List, Iterable
 
 from elasticsearch import AsyncElasticsearch, NotFoundError, ConnectionError
 from elasticsearch.helpers import async_streaming_bulk
-from scribe.schema.result import Outputs, Censor
+from scribe.schema.result import Censor, Outputs
 from scribe.schema.tags import clean_tags
 from scribe.schema.url import normalize_name
 from scribe.error import TooManyClaimSearchParametersError
@@ -285,18 +285,21 @@ class SearchIndex:
         async with cache_item.lock:
             if cache_item.result:
                 return cache_item.result
-            censor = Censor(Censor.SEARCH)
             response, offset, total = await self.search(**kwargs)
-            censor.apply(response)
+            censored = {}
+            for row in response:
+                if (row.get('censor_type') or 0) >= Censor.SEARCH:
+                    censoring_channel_hash = bytes.fromhex(row['censoring_channel_id'])[::-1]
+                    censored.setdefault(censoring_channel_hash, set())
+                    censored[censoring_channel_hash].add(row['tx_hash'])
             total_referenced.extend(response)
-
-            if censor.censored:
+            if censored:
                 response, _, _ = await self.search(**kwargs, censor_type=Censor.NOT_CENSORED)
                 total_referenced.extend(response)
             response = [self._make_resolve_result(r) for r in response]
             extra = [self._make_resolve_result(r) for r in await self._get_referenced_rows(total_referenced)]
             result = Outputs.to_base64(
-                response, extra, offset, total, censor
+                response, extra, offset, total, censored
             )
             cache_item.result = result
             return result
@@ -313,7 +316,6 @@ class SearchIndex:
             )
             for result in expand_result(filter(lambda doc: doc['found'], results["docs"])):
                 self.claim_cache.set(result['claim_id'], result)
-
 
     async def search(self, **kwargs):
         try:

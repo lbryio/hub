@@ -327,7 +327,7 @@ class HubDB:
             if blocker_hash:
                 reason_row = self._fs_get_claim_by_hash(blocker_hash)
                 return ExpandedResolveResult(
-                    None, ResolveCensoredError(url, blocker_hash, censor_row=reason_row), None, None
+                    None, ResolveCensoredError(url, blocker_hash.hex(), censor_row=reason_row), None, None
                 )
             if claim.reposted_claim_hash:
                 repost = self._fs_get_claim_by_hash(claim.reposted_claim_hash)
