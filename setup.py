@@ -42,7 +42,8 @@ setup(
         'hachoir==3.1.2',
         'filetype==1.0.9',
         'grpcio==1.38.0',
-        'lbry-rocksdb==0.8.2'
+        'lbry-rocksdb==0.8.2',
+        'ujson==5.1.0'
     ],
     extras_require={
         'lint': ['pylint==2.10.0'],

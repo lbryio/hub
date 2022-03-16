@@ -1,5 +1,6 @@
 import itertools
 import json
+import ujson
 import typing
 import asyncio
 from asyncio import Event
@@ -186,7 +187,7 @@ class JSONRPC:
     def encode_payload(cls, payload):
         """Encode a Python object as JSON and convert it to bytes."""
         try:
-            return json.dumps(payload).encode()
+            return ujson.dumps(payload).encode()
         except TypeError:
             msg = f'JSON payload encoding error: {payload}'
             raise ProtocolError(cls.INTERNAL_ERROR, msg) from None
