@@ -6,9 +6,8 @@ from itertools import chain
 from scribe.error import ResolveCensoredError
 from scribe.schema.types.v2.result_pb2 import Outputs as OutputsMessage
 from scribe.schema.types.v2.result_pb2 import Error as ErrorMessage
-# if TYPE_CHECKING:
-#     from lbry_schema.schema.claim import ResolveResult
-
+if TYPE_CHECKING:
+    from scribe.db.common import ResolveResult
 INVALID = ErrorMessage.Code.Name(ErrorMessage.INVALID)
 NOT_FOUND = ErrorMessage.Code.Name(ErrorMessage.NOT_FOUND)
 BLOCKED = ErrorMessage.Code.Name(ErrorMessage.BLOCKED)
@@ -50,38 +49,17 @@ class Censor:
             return censoring_channel_hash
         return None
 
-    def to_message(self, outputs: OutputsMessage, extra_txo_rows: dict):
+    def to_message(self, outputs: OutputsMessage, extra_txo_rows: List['ResolveResult']):
         for censoring_channel_hash, count in self.censored.items():
+            outputs.blocked_total += len(count)
             blocked = outputs.blocked.add()
             blocked.count = len(count)
-            set_reference(blocked.channel, censoring_channel_hash, extra_txo_rows)
-            outputs.blocked_total += len(count)
-
-
-class ResolveResult(NamedTuple):
-    name: str
-    normalized_name: str
-    claim_hash: bytes
-    tx_num: int
-    position: int
-    tx_hash: bytes
-    height: int
-    amount: int
-    short_url: str
-    is_controlling: bool
-    canonical_url: str
-    creation_height: int
-    activation_height: int
-    expiration_height: int
-    effective_amount: int
-    support_amount: int
-    reposted: int
-    last_takeover_height: Optional[int]
-    claims_in_channel: Optional[int]
-    channel_hash: Optional[bytes]
-    reposted_claim_hash: Optional[bytes]
-    signature_valid: Optional[bool]
-
+            for resolve_result in extra_txo_rows:
+                if resolve_result.claim_hash == censoring_channel_hash:
+                    blocked.channel.tx_hash = resolve_result.tx_hash
+                    blocked.channel.nout = resolve_result.position
+                    blocked.channel.height = resolve_result.height
+                    return
 
 
 class Outputs:
@@ -194,7 +172,7 @@ class Outputs:
         )
 
     @classmethod
-    def to_base64(cls, txo_rows, extra_txo_rows, offset=0, total=None, blocked=None) -> str:
+    def to_base64(cls, txo_rows, extra_txo_rows, offset=0, total=None, blocked: Censor = None) -> str:
         return base64.b64encode(cls.to_bytes(txo_rows, extra_txo_rows, offset, total, blocked)).decode()
 
     @classmethod
@@ -206,37 +184,30 @@ class Outputs:
         if blocked is not None:
             blocked.to_message(page, extra_txo_rows)
         for row in extra_txo_rows:
-            txo_message: 'OutputsMessage' = page.extra_txos.add()
-            if not isinstance(row, Exception):
-                if row.channel_hash:
-                    set_reference(txo_message.claim.channel, row.channel_hash, extra_txo_rows)
-                if row.reposted_claim_hash:
-                    set_reference(txo_message.claim.repost, row.reposted_claim_hash, extra_txo_rows)
-            cls.encode_txo(txo_message, row)
-
+            cls.encode_txo(page.extra_txos.add(), row)
         for row in txo_rows:
-            # cls.row_to_message(row, page.txos.add(), extra_txo_rows)
-            txo_message: 'OutputsMessage' = page.txos.add()
-            cls.encode_txo(txo_message, row)
-            if not isinstance(row, Exception):
-                if row.channel_hash:
-                    set_reference(txo_message.claim.channel, row.channel_hash, extra_txo_rows)
-                if row.reposted_claim_hash:
-                    set_reference(txo_message.claim.repost, row.reposted_claim_hash, extra_txo_rows)
-            elif isinstance(row, ResolveCensoredError):
-                set_reference(txo_message.error.blocked.channel, row.censor_id, extra_txo_rows)
+            txo_message = page.txos.add()
+            if isinstance(row, ResolveCensoredError):
+                for resolve_result in extra_txo_rows:
+                    if resolve_result.claim_hash == row.censor_id:
+                        txo_message.error.code = ErrorMessage.BLOCKED
+                        txo_message.error.text = str(row)
+                        txo_message.error.blocked.channel.tx_hash = resolve_result.tx_hash
+                        txo_message.error.blocked.channel.nout = resolve_result.position
+                        txo_message.error.blocked.channel.height = resolve_result.height
+                        break
+            else:
+                cls.encode_txo(txo_message, row)
         return page.SerializeToString()
 
     @classmethod
-    def encode_txo(cls, txo_message, resolve_result: Union[ResolveResult, Exception]):
+    def encode_txo(cls, txo_message: OutputsMessage, resolve_result: Union['ResolveResult', Exception]):
         if isinstance(resolve_result, Exception):
             txo_message.error.text = resolve_result.args[0]
             if isinstance(resolve_result, ValueError):
                 txo_message.error.code = ErrorMessage.INVALID
             elif isinstance(resolve_result, LookupError):
                 txo_message.error.code = ErrorMessage.NOT_FOUND
-            elif isinstance(resolve_result, ResolveCensoredError):
-                txo_message.error.code = ErrorMessage.BLOCKED
             return
         txo_message.tx_hash = resolve_result.tx_hash
         txo_message.nout = resolve_result.position
@@ -256,3 +227,11 @@ class Outputs:
             txo_message.claim.take_over_height = resolve_result.last_takeover_height
         if resolve_result.claims_in_channel is not None:
             txo_message.claim.claims_in_channel = resolve_result.claims_in_channel
+        if resolve_result.reposted_claim_hash and resolve_result.reposted_tx_hash is not None:
+            txo_message.claim.repost.tx_hash = resolve_result.reposted_tx_hash
+            txo_message.claim.repost.nout = resolve_result.reposted_tx_position
+            txo_message.claim.repost.height = resolve_result.reposted_height
+        if resolve_result.channel_hash and resolve_result.channel_tx_hash is not None:
+            txo_message.claim.channel.tx_hash = resolve_result.channel_tx_hash
+            txo_message.claim.channel.nout = resolve_result.channel_tx_position
+            txo_message.claim.channel.height = resolve_result.channel_height

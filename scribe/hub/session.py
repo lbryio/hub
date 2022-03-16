@@ -1195,7 +1195,7 @@ class LBRYElectrumX(asyncio.Protocol):
                 channel_url = kwargs.pop('channel')
                 _, channel_claim, _, _ = await self.db.resolve(channel_url)
                 if not channel_claim or isinstance(channel_claim, (ResolveCensoredError, LookupError, ValueError)):
-                    return Outputs.to_base64([], [], 0, None, None)
+                    return Outputs.to_base64([], [])
                 kwargs['channel_id'] = channel_claim.claim_hash.hex()
             return await self.session_manager.search_index.cached_search(kwargs)
         except ConnectionTimeout:
@@ -1232,6 +1232,12 @@ class LBRYElectrumX(asyncio.Protocol):
                 elif isinstance(stream, ResolveCensoredError):
                     rows.append(stream)
                     extra.append(stream.censor_row)
+                elif isinstance(repost, ResolveCensoredError):
+                    rows.append(repost)
+                    extra.append(repost.censor_row)
+                elif isinstance(reposted_channel, ResolveCensoredError):
+                    rows.append(reposted_channel)
+                    extra.append(reposted_channel.censor_row)
                 elif channel and not stream:
                     rows.append(channel)
                     # print("resolved channel", channel.name.decode())
@@ -1251,7 +1257,7 @@ class LBRYElectrumX(asyncio.Protocol):
                         extra.append(reposted_channel)
                 await asyncio.sleep(0)
             self.session_manager.resolve_outputs_cache[sorted_urls] = result = await self.loop.run_in_executor(
-                None, Outputs.to_base64, rows, extra, 0, None, None
+                None, Outputs.to_base64, rows, extra
             )
             return result
         finally:
@@ -1271,14 +1277,24 @@ class LBRYElectrumX(asyncio.Protocol):
 
         return await asyncio.get_event_loop().run_in_executor(self.db._executor, get_height)
 
-    async def claimtrie_getclaimbyid(self, claim_id):
+    def _getclaimbyid(self, claim_id: str):
         rows = []
         extra = []
-        stream = await self.db.fs_getclaimbyid(claim_id)
-        if not stream:
-            stream = LookupError(f"Could not find claim at {claim_id}")
-        rows.append(stream)
+        claim_hash = bytes.fromhex(claim_id)
+        stream = self.db._fs_get_claim_by_hash(claim_hash)
+        rows.append(stream or LookupError(f"Could not find claim at {claim_id}"))
+        if stream and stream.channel_hash:
+            channel = self.db._fs_get_claim_by_hash(stream.channel_hash)
+            extra.append(channel or LookupError(f"Could not find channel at {stream.channel_hash.hex()}"))
+        if stream and stream.reposted_claim_hash:
+            repost = self.db._fs_get_claim_by_hash(stream.reposted_claim_hash)
+            if repost:
+                extra.append(repost)
         return Outputs.to_base64(rows, extra, 0, None, None)
+
+    async def claimtrie_getclaimbyid(self, claim_id):
+        assert len(claim_id) == 40, f"{len(claim_id)}: '{claim_id}'"
+        return await self.loop.run_in_executor(None, self._getclaimbyid, claim_id)
 
     def assert_tx_hash(self, value):
         '''Raise an RPCError if the value is not a valid transaction

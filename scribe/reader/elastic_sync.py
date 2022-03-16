@@ -274,7 +274,6 @@ class ElasticWriter(BaseBlockchainReader):
                     else:
                         success += 1
                 await self.sync_client.indices.refresh(self.index)
-                await self.db.reload_blocking_filtering_streams()
                 await self.apply_filters(
                     self.db.blocked_streams, self.db.blocked_channels, self.db.filtered_streams,
                     self.db.filtered_channels
@@ -315,6 +314,13 @@ class ElasticWriter(BaseBlockchainReader):
     def run(self, reindex=False):
         self._force_reindex = reindex
         return super().run()
+
+    async def start(self, reindex=False):
+        self._force_reindex = reindex
+        try:
+            return await super().start()
+        finally:
+            self._force_reindex = False
 
     async def _reindex(self):
         async with self._lock:

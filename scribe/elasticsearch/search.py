@@ -472,6 +472,38 @@ class SearchIndex:
         self.search_cache.clear()
         self.claim_cache.clear()
 
+    def _make_resolve_result(self, es_result):
+        return ResolveResult(
+            name=es_result['claim_name'],
+            normalized_name=es_result['normalized_name'],
+            claim_hash=es_result['claim_hash'],
+            tx_num=es_result['tx_num'],
+            position=es_result['tx_nout'],
+            tx_hash=es_result['tx_hash'],
+            height=es_result['height'],
+            amount=es_result['amount'],
+            short_url=es_result['short_url'],
+            is_controlling=es_result['is_controlling'],
+            canonical_url=es_result['canonical_url'],
+            creation_height=es_result['creation_height'],
+            activation_height=es_result['activation_height'],
+            expiration_height=es_result['expiration_height'],
+            effective_amount=es_result['effective_amount'],
+            support_amount=es_result['support_amount'],
+            last_takeover_height=es_result['last_take_over_height'],
+            claims_in_channel=es_result['claims_in_channel'],
+            channel_hash=es_result['channel_hash'],
+            reposted_claim_hash=es_result['reposted_claim_hash'],
+            reposted=es_result['reposted'],
+            signature_valid=es_result['signature_valid'],
+            reposted_tx_hash=bytes.fromhex(es_result['reposted_tx_id'] or '')[::-1] or None,
+            reposted_tx_position=es_result['reposted_tx_position'],
+            reposted_height=es_result['reposted_height'],
+            channel_tx_hash=bytes.fromhex(es_result['channel_tx_id'] or '')[::-1] or None,
+            channel_tx_position=es_result['channel_tx_position'],
+            channel_height=es_result['channel_height'],
+        )
+
     async def cached_search(self, kwargs):
         total_referenced = []
         cache_item = ResultCacheItem.from_cache(str(kwargs), self.search_cache)
@@ -481,68 +513,15 @@ class SearchIndex:
             if cache_item.result:
                 return cache_item.result
             censor = Censor(Censor.SEARCH)
-            if kwargs.get('no_totals'):
-                response, offset, total = await self.search(**kwargs, censor_type=Censor.NOT_CENSORED)
-            else:
-                response, offset, total = await self.search(**kwargs)
+            response, offset, total = await self.search(**kwargs)
             censor.apply(response)
             total_referenced.extend(response)
 
             if censor.censored:
                 response, _, _ = await self.search(**kwargs, censor_type=Censor.NOT_CENSORED)
                 total_referenced.extend(response)
-            response = [
-                ResolveResult(
-                    name=r['claim_name'],
-                    normalized_name=r['normalized_name'],
-                    claim_hash=r['claim_hash'],
-                    tx_num=r['tx_num'],
-                    position=r['tx_nout'],
-                    tx_hash=r['tx_hash'],
-                    height=r['height'],
-                    amount=r['amount'],
-                    short_url=r['short_url'],
-                    is_controlling=r['is_controlling'],
-                    canonical_url=r['canonical_url'],
-                    creation_height=r['creation_height'],
-                    activation_height=r['activation_height'],
-                    expiration_height=r['expiration_height'],
-                    effective_amount=r['effective_amount'],
-                    support_amount=r['support_amount'],
-                    last_takeover_height=r['last_take_over_height'],
-                    claims_in_channel=r['claims_in_channel'],
-                    channel_hash=r['channel_hash'],
-                    reposted_claim_hash=r['reposted_claim_hash'],
-                    reposted=r['reposted'],
-                    signature_valid=r['signature_valid']
-                ) for r in response
-            ]
-            extra = [
-                ResolveResult(
-                    name=r['claim_name'],
-                    normalized_name=r['normalized_name'],
-                    claim_hash=r['claim_hash'],
-                    tx_num=r['tx_num'],
-                    position=r['tx_nout'],
-                    tx_hash=r['tx_hash'],
-                    height=r['height'],
-                    amount=r['amount'],
-                    short_url=r['short_url'],
-                    is_controlling=r['is_controlling'],
-                    canonical_url=r['canonical_url'],
-                    creation_height=r['creation_height'],
-                    activation_height=r['activation_height'],
-                    expiration_height=r['expiration_height'],
-                    effective_amount=r['effective_amount'],
-                    support_amount=r['support_amount'],
-                    last_takeover_height=r['last_take_over_height'],
-                    claims_in_channel=r['claims_in_channel'],
-                    channel_hash=r['channel_hash'],
-                    reposted_claim_hash=r['reposted_claim_hash'],
-                    reposted=r['reposted'],
-                    signature_valid=r['signature_valid']
-                ) for r in await self._get_referenced_rows(total_referenced)
-            ]
+            response = [self._make_resolve_result(r) for r in response]
+            extra = [self._make_resolve_result(r) for r in await self._get_referenced_rows(total_referenced)]
             result = Outputs.to_base64(
                 response, extra, offset, total, censor
             )

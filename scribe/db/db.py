@@ -168,7 +168,6 @@ class HubDB:
         height = bisect_right(self.tx_counts, tx_num)
         created_height = bisect_right(self.tx_counts, root_tx_num)
         last_take_over_height = controlling_claim.height
-
         expiration_height = self.coin.get_expiration_height(height)
         support_amount = self.get_support_amount(claim_hash)
         claim_amount = self.get_cached_claim_txo(claim_hash).amount
@@ -176,9 +175,21 @@ class HubDB:
         effective_amount = self.get_effective_amount(claim_hash)
         channel_hash = self.get_channel_for_claim(claim_hash, tx_num, position)
         reposted_claim_hash = self.get_repost(claim_hash)
+        reposted_tx_hash = None
+        reposted_tx_position = None
+        reposted_height = None
+        if reposted_claim_hash:
+            repost_txo = self.get_cached_claim_txo(reposted_claim_hash)
+            if repost_txo:
+                reposted_tx_hash = self.get_tx_hash(repost_txo.tx_num)
+                reposted_tx_position = repost_txo.position
+                reposted_height = bisect_right(self.tx_counts, repost_txo.tx_num)
         short_url = self.get_short_claim_id_url(name, normalized_name, claim_hash, root_tx_num, root_position)
         canonical_url = short_url
         claims_in_channel = self.get_claims_in_channel_count(claim_hash)
+        channel_tx_hash = None
+        channel_tx_position = None
+        channel_height = None
         if channel_hash:
             channel_vals = self.get_cached_claim_txo(channel_hash)
             if channel_vals:
@@ -187,6 +198,9 @@ class HubDB:
                     channel_vals.root_position
                 )
                 canonical_url = f'{channel_short_url}/{short_url}'
+                channel_tx_hash = self.get_tx_hash(channel_vals.tx_num)
+                channel_tx_position = channel_vals.position
+                channel_height = bisect_right(self.tx_counts, channel_vals.tx_num)
         return ResolveResult(
             name, normalized_name, claim_hash, tx_num, position, tx_hash, height, claim_amount, short_url=short_url,
             is_controlling=controlling_claim.claim_hash == claim_hash, canonical_url=canonical_url,
@@ -195,7 +209,9 @@ class HubDB:
             expiration_height=expiration_height, effective_amount=effective_amount, support_amount=support_amount,
             channel_hash=channel_hash, reposted_claim_hash=reposted_claim_hash,
             reposted=self.get_reposted_count(claim_hash),
-            signature_valid=None if not channel_hash else signature_valid
+            signature_valid=None if not channel_hash else signature_valid, reposted_tx_hash=reposted_tx_hash,
+            reposted_tx_position=reposted_tx_position, reposted_height=reposted_height,
+            channel_tx_hash=channel_tx_hash, channel_tx_position=channel_tx_position, channel_height=channel_height,
         )
 
     def _resolve_parsed_url(self, name: str, claim_id: Optional[str] = None,
@@ -396,16 +412,6 @@ class HubDB:
             return 0
         return channel_count_val.count
 
-    async def reload_blocking_filtering_streams(self):
-        def reload():
-            self.blocked_streams, self.blocked_channels = self.get_streams_and_channels_reposted_by_channel_hashes(
-                self.blocking_channel_hashes
-            )
-            self.filtered_streams, self.filtered_channels = self.get_streams_and_channels_reposted_by_channel_hashes(
-                self.filtering_channel_hashes
-            )
-        await asyncio.get_event_loop().run_in_executor(self._executor, reload)
-
     def get_streams_and_channels_reposted_by_channel_hashes(self, reposter_channel_hashes: Set[bytes]):
         streams, channels = {}, {}
         for reposter_channel_hash in reposter_channel_hashes:
@@ -474,7 +480,7 @@ class HubDB:
             fee_amount = int(max(metadata.stream.fee.amount or 0, 0) * 1000)
             if fee_amount >= 9223372036854775807:
                 return
-        reposted_claim_hash = None if not metadata.is_repost else metadata.repost.reference.claim_hash[::-1]
+        reposted_claim_hash = claim.reposted_claim_hash
         reposted_claim = None
         reposted_metadata = None
         if reposted_claim_hash:
@@ -496,15 +502,14 @@ class HubDB:
         reposted_fee_currency = None
         reposted_duration = None
         if reposted_claim:
-            reposted_tx_hash = self.get_tx_hash(reposted_claim.tx_num)
-            raw_reposted_claim_tx = self.prefix_db.tx.get(reposted_tx_hash, deserialize_value=False)
+            raw_reposted_claim_tx = self.prefix_db.tx.get(claim.reposted_tx_hash, deserialize_value=False)
             try:
                 reposted_metadata = self.coin.transaction(
                     raw_reposted_claim_tx
                 ).outputs[reposted_claim.position].metadata
             except:
                 self.logger.error("failed to parse reposted claim in tx %s that was reposted by %s",
-                                  reposted_tx_hash[::-1].hex(), claim_hash.hex())
+                                  claim.reposted_claim_hash.hex(), claim_hash.hex())
                 return
         if reposted_metadata:
             if reposted_metadata.is_stream:
@@ -605,7 +610,13 @@ class HubDB:
             'languages': languages,
             'censor_type': Censor.RESOLVE if blocked_hash else Censor.SEARCH if filtered_hash else Censor.NOT_CENSORED,
             'censoring_channel_id': (blocked_hash or filtered_hash or b'').hex() or None,
-            'claims_in_channel': None if not metadata.is_channel else self.get_claims_in_channel_count(claim_hash)
+            'claims_in_channel': None if not metadata.is_channel else self.get_claims_in_channel_count(claim_hash),
+            'reposted_tx_id': None if not claim.reposted_tx_hash else claim.reposted_tx_hash[::-1].hex(),
+            'reposted_tx_position': claim.reposted_tx_position,
+            'reposted_height': claim.reposted_height,
+            'channel_tx_id': None if not claim.channel_tx_hash else claim.channel_tx_hash[::-1].hex(),
+            'channel_tx_position': claim.channel_tx_position,
+            'channel_height': claim.channel_height,
         }
 
         if metadata.is_repost and reposted_duration is not None:

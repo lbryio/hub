@@ -66,20 +66,25 @@ FIELDS = {
     'duration', 'release_time',
     'tags', 'languages', 'has_source', 'reposted_claim_type',
     'reposted_claim_id', 'repost_count', 'sd_hash',
-    'trending_score', 'tx_num'
+    'trending_score', 'tx_num',
+    'channel_tx_id', 'channel_tx_position', 'channel_height',  'reposted_tx_id',
+    'reposted_tx_position', 'reposted_height',
 }
 
-TEXT_FIELDS = {'author', 'canonical_url', 'channel_id', 'description', 'claim_id', 'censoring_channel_id',
-               'media_type', 'normalized_name', 'public_key_bytes', 'public_key_id', 'short_url', 'signature',
-               'claim_name', 'signature_digest', 'title', 'tx_id', 'fee_currency', 'reposted_claim_id',
-               'tags', 'sd_hash'}
+TEXT_FIELDS = {
+    'author', 'canonical_url', 'channel_id', 'description', 'claim_id', 'censoring_channel_id',
+    'media_type', 'normalized_name', 'public_key_bytes', 'public_key_id', 'short_url', 'signature',
+    'claim_name', 'signature_digest', 'title', 'tx_id', 'fee_currency', 'reposted_claim_id',
+    'tags', 'sd_hash', 'channel_tx_id', 'reposted_tx_id',
+}
 
 RANGE_FIELDS = {
     'height', 'creation_height', 'activation_height', 'expiration_height',
     'timestamp', 'creation_timestamp', 'duration', 'release_time', 'fee_amount',
     'tx_position', 'repost_count', 'limit_claims_per_channel',
     'amount', 'effective_amount', 'support_amount',
-    'trending_score', 'censor_type', 'tx_num'
+    'trending_score', 'censor_type', 'tx_num', 'reposted_tx_position', 'reposted_height',
+    'channel_tx_position', 'channel_height',
 }
 
 ALL_FIELDS = RANGE_FIELDS | TEXT_FIELDS | FIELDS

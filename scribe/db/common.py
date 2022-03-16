@@ -496,6 +496,12 @@ class ResolveResult(typing.NamedTuple):
     channel_hash: typing.Optional[bytes]
     reposted_claim_hash: typing.Optional[bytes]
     signature_valid: typing.Optional[bool]
+    reposted_tx_hash: typing.Optional[bytes]
+    reposted_tx_position: typing.Optional[int]
+    reposted_height: typing.Optional[int]
+    channel_tx_hash: typing.Optional[bytes]
+    channel_tx_position: typing.Optional[int]
+    channel_height: typing.Optional[int]
 
 
 class TrendingNotification(typing.NamedTuple):
