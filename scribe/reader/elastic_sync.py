@@ -296,9 +296,12 @@ class ElasticWriter(BaseBlockchainReader):
         last_state = self.db.prefix_db.db_state.get()
         db_height = last_state.height
         if last_state and self._last_wrote_height and db_height > self._last_wrote_height:
-            self.log.info(
-                "syncing ES from block %i to rocksdb height of %i", self._last_wrote_height, last_state.height
+            self.log.warning(
+                "syncing ES from block %i to rocksdb height of %i (%i blocks to sync)",
+                self._last_wrote_height, last_state.height, last_state.height - self._last_wrote_height
             )
+            for _ in range(self._last_wrote_height + 1, last_state.height + 1):
+                super().unwind()
             for height in range(self._last_wrote_height + 1, last_state.height + 1):
                 self.advance(height)
         else:

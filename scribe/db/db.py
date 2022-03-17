@@ -723,8 +723,8 @@ class HubDB:
         return results
 
     async def _read_tx_counts(self):
-        if self.tx_counts is not None:
-            return
+        # if self.tx_counts is not None:
+        #     return
         # tx_counts[N] has the cumulative number of txs at the end of
         # height N.  So tx_counts[0] is 1 - the genesis coinbase
 
@@ -761,8 +761,8 @@ class HubDB:
         self.logger.info("loaded %i claim txos in %ss", len(self.claim_to_txo), round(ts, 4))
 
     async def _read_headers(self):
-        if self.headers is not None:
-            return
+        # if self.headers is not None:
+        #     return
 
         def get_headers():
             return [
