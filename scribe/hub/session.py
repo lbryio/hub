@@ -198,7 +198,7 @@ class SessionManager:
 
         # Search index
         self.search_index = SearchIndex(
-            self.env.es_index_prefix, self.env.database_query_timeout,
+            self.db, self.env.es_index_prefix, self.env.database_query_timeout,
             elastic_host=env.elastic_host, elastic_port=env.elastic_port
         )
         self.running = False
