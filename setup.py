@@ -30,7 +30,7 @@ setup(
     },
     install_requires=[
         'aiohttp==3.6.2',
-        'certifi>=2018.11.29',
+        'certifi>=2021.10.08',
         'colorama==0.3.7',
         'protobuf==3.17.2',
         'msgpack==0.6.1',
