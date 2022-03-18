@@ -1372,7 +1372,10 @@ class LBRYElectrumX(asyncio.Protocol):
 
     async def hashX_unsubscribe(self, hashX, alias):
         sessions = self.session_manager.hashx_subscriptions_by_session[hashX]
-        sessions.remove(id(self))
+        try:
+            sessions.remove(id(self))
+        except KeyError:
+            pass
         if not sessions:
             self.hashX_subs.pop(hashX, None)
 
