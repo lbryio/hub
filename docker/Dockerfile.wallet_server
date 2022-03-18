@@ -1,0 +1,53 @@
+FROM debian:11-slim
+
+ARG user=lbry
+ARG db_dir=/database
+ARG projects_dir=/home/$user
+
+ARG DOCKER_TAG
+ARG DOCKER_COMMIT=docker
+ENV DOCKER_TAG=$DOCKER_TAG DOCKER_COMMIT=$DOCKER_COMMIT
+
+RUN apt-get update && \
+    apt-get -y --no-install-recommends install \
+      wget \
+      tar unzip \
+      build-essential \
+      automake libtool \
+      pkg-config \
+      python3.9 \
+      python3.9-dev \
+      python3-pip  && \
+    update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1 && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 999 $user && useradd -m -u 999 -g $user $user
+RUN mkdir -p $db_dir
+RUN chown -R $user:$user $db_dir
+
+COPY . $projects_dir
+RUN chown -R $user:$user $projects_dir
+
+USER $user
+WORKDIR $projects_dir
+RUN python3.9 -m pip install pip
+RUN python3.9 -m pip install -e .
+RUN python3.9 docker/set_build.py
+RUN rm ~/.cache -rf
+
+# entry point
+ARG host=localhost
+ARG tcp_port=50001
+ARG daemon_url=http://lbry:lbry@localhost:9245/
+VOLUME $db_dir
+ENV TCP_PORT=$tcp_port
+ENV HOST=$host
+ENV DAEMON_URL=$daemon_url
+ENV DB_DIRECTORY=$db_dir
+ENV MAX_SESSIONS=100000
+ENV MAX_SEND=1000000000000000000
+ENV MAX_RECEIVE=1000000000000000000
+
+
+COPY ./docker/wallet_server_entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
