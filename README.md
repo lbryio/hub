@@ -28,7 +28,20 @@ scribe --db_dir /your/db/path --daemon_url rpcuser:rpcpass@localhost:9245
 
 ## Running from source
 
-Installing from source is also relatively painless. Full instructions are in [INSTALL.md](INSTALL.md)
+1. clone the scribe scribe
+```
+git clone https://github.com/lbryio/scribe.git
+cd scribe
+```
+2. make a virtual env
+```
+python3.9 -m venv scribe-venv
+```
+3. from the virtual env, install scribe
+```
+source scribe-venv/bin/activate
+pip install -e .
+```
 
 ## Contributing
 
