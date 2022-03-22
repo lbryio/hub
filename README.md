@@ -1,5 +1,10 @@
-Scribe maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the [LBRY blockchain](https://github.com/lbryio/lbrycrd) and provides an interface for python based services that utilize the blockchain data in an ongoing manner. Scribe includes implementations of this interface to provide an electrum server for thin-wallet clients (such as lbry-sdk) and to maintain an elasticsearch database of metadata for claims in the LBRY blockchain.
+## Scribe
 
+`scribe` maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the [LBRY blockchain](https://github.com/lbryio/lbrycrd) and provides an interface for python based services that utilize the blockchain data in an ongoing manner. Scribe includes two implementations of this interface:
+ * `scribe-hub` - an electrum server for thin-wallet clients (such as lbry-sdk), provides an api for clients to resolve and search claims published to the LBRY blockchain.
+ * `scribe-elastic-sync` - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
+
+Other features and overview of scribe:
  * Uses Python 3.7-3.9 (3.10 probably works but hasn't yet been tested)
  * Protobuf schema for encoding and decoding metadata stored on the blockchain ([scribe.schema](https://github.com/lbryio/scribe/tree/master/scribe/schema)).
  * Blockchain processor that maintains an up to date rocksdb database ([scribe.blockchain.service](https://github.com/lbryio/scribe/tree/master/scribe/blockchain/service.py))
