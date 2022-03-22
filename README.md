@@ -48,6 +48,10 @@ source scribe-venv/bin/activate
 pip install -e .
 ```
 
+## Trending
+
+For a detailed explaination of the [trending algorithm](https://github.com/lbryio/scribe/blob/master/scribe/elasticsearch/fast_ar_trending.py) used for claim search, see [this](https://raw.githubusercontent.com/lbryio/scribe/master/scribe/elasticsearch/trending%20algorithm.pdf) paper
+
 ## Contributing
 
 Contributions to this project are welcome, encouraged, and compensated. For more details, please check [this](https://lbry.tech/contribute) link.
