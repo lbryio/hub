@@ -4,8 +4,8 @@ import typing
 from typing import List
 from hashlib import sha256
 from decimal import Decimal
-from scribe.base58 import Base58
-from scribe.bip32 import PublicKey
+from scribe.schema.base58 import Base58
+from scribe.schema.bip32 import PublicKey
 from scribe.common import hash160, hash_to_hex_str, double_sha256
 from scribe.blockchain.transaction import TxOutput, TxInput, Block
 from scribe.blockchain.transaction.deserializer import Deserializer

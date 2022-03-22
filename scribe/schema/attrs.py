@@ -7,12 +7,12 @@ from string import ascii_letters
 from decimal import Decimal, ROUND_UP
 from google.protobuf.json_format import MessageToDict
 
-from scribe.base58 import Base58, b58_encode
+from scribe.schema.base58 import Base58, b58_encode
 from scribe.error import MissingPublishedFileError, EmptyPublishedFileError
 
 from scribe.schema.mime_types import guess_media_type
 from scribe.schema.base import Metadata, BaseMessageList
-from scribe.schema.tags import clean_tags, normalize_tag
+from scribe.schema.tags import normalize_tag
 from scribe.schema.types.v2.claim_pb2 import (
     Fee as FeeMessage,
     Location as LocationMessage,

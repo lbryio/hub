@@ -8,7 +8,7 @@ from coincurve.utils import (
     pem_to_der, lib as libsecp256k1, ffi as libsecp256k1_ffi
 )
 from coincurve.ecdsa import CDATA_SIG_LENGTH
-from scribe.base58 import Base58
+from scribe.schema.base58 import Base58
 
 
 if (sys.version_info.major, sys.version_info.minor) > (3, 7):

@@ -1,24 +1,21 @@
-import logging
 import time
 import asyncio
 import typing
-import signal
 from bisect import bisect_right
 from struct import pack
-from concurrent.futures.thread import ThreadPoolExecutor
 from typing import Optional, List, Tuple, Set, DefaultDict, Dict
 from prometheus_client import Gauge, Histogram
 from collections import defaultdict
 
 from scribe import __version__, PROMETHEUS_NAMESPACE
-from scribe.db.db import HubDB
 from scribe.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from scribe.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
 from scribe.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS
 from scribe.blockchain.daemon import LBCDaemon
-from scribe.blockchain.transaction import Tx, TxOutput, TxInput
+from scribe.blockchain.transaction import Tx, TxOutput, TxInput, Block
 from scribe.blockchain.prefetcher import Prefetcher
 from scribe.schema.url import normalize_name
+from scribe.service import BlockchainService
 if typing.TYPE_CHECKING:
     from scribe.env import Env
     from scribe.db.revertable import RevertableOpStack
@@ -56,7 +53,7 @@ class StagedClaimtrieItem(typing.NamedTuple):
 NAMESPACE = f"{PROMETHEUS_NAMESPACE}_writer"
 
 
-class BlockProcessor:
+class BlockchainProcessorService(BlockchainService):
     """Process blocks and update the DB state to match.
 
     Employ a prefetcher to prefetch blocks in batches for processing.
@@ -74,20 +71,11 @@ class BlockProcessor:
     )
 
     def __init__(self, env: 'Env'):
-        self.cancellable_tasks = []
-
-        self.env = env
-        self.state_lock = asyncio.Lock()
+        super().__init__(env, secondary_name='', thread_workers=1, thread_prefix='block-processor')
         self.daemon = LBCDaemon(env.coin, env.daemon_url)
-        self._chain_executor = ThreadPoolExecutor(1, thread_name_prefix='block-processor')
-        self.db = HubDB(
-            env.coin, env.db_dir, env.cache_MB, env.reorg_limit, env.cache_all_claim_txos, env.cache_all_tx_hashes,
-            max_open_files=env.db_max_open_files, blocking_channel_ids=env.blocking_channel_ids,
-            filtering_channel_ids=env.filtering_channel_ids, executor=self._chain_executor
-        )
-        self.shutdown_event = asyncio.Event()
         self.coin = env.coin
         self.wait_for_blocks_duration = 0.1
+        self._ready_to_stop = asyncio.Event()
 
         self._caught_up_event: Optional[asyncio.Event] = None
         self.height = 0
@@ -96,7 +84,7 @@ class BlockProcessor:
 
         self.blocks_event = asyncio.Event()
         self.prefetcher = Prefetcher(self.daemon, env.coin, self.blocks_event)
-        self.logger = logging.getLogger(__name__)
+        # self.logger = logging.getLogger(__name__)
 
         # Meta
         self.touched_hashXs: Set[bytes] = set()
@@ -163,9 +151,6 @@ class BlockProcessor:
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
-        self._stopping = False
-        self._ready_to_stop = asyncio.Event()
-
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
         # cancellations from shutdown don't lose work - when the task
@@ -173,13 +158,13 @@ class BlockProcessor:
         # Take the state lock to be certain in-memory state is
         # consistent and not being updated elsewhere.
         async def run_in_thread_locked():
-            async with self.state_lock:
-                return await asyncio.get_event_loop().run_in_executor(self._chain_executor, func, *args)
+            async with self.lock:
+                return await asyncio.get_event_loop().run_in_executor(self._executor, func, *args)
         return await asyncio.shield(run_in_thread_locked())
 
     async def run_in_thread(self, func, *args):
         async def run_in_thread():
-            return await asyncio.get_event_loop().run_in_executor(self._chain_executor, func, *args)
+            return await asyncio.get_event_loop().run_in_executor(self._executor, func, *args)
         return await asyncio.shield(run_in_thread())
 
     async def refresh_mempool(self):
@@ -195,13 +180,13 @@ class BlockProcessor:
                 mempool_prefix.stage_delete((tx_hash,), (raw_tx,))
             unsafe_commit()
 
-        async with self.state_lock:
+        async with self.lock:
             current_mempool = await self.run_in_thread(fetch_mempool, self.db.prefix_db.mempool_tx)
             _to_put = []
             try:
                 mempool_hashes = await self.daemon.mempool_hashes()
-            except (TypeError, RPCError):
-                self.logger.warning("failed to get mempool tx hashes, reorg underway?")
+            except (TypeError, RPCError) as err:
+                self.log.exception("failed to get mempool tx hashes, reorg underway? (%s)", err)
                 return
             for hh in mempool_hashes:
                 tx_hash = bytes.fromhex(hh)[::-1]
@@ -211,7 +196,7 @@ class BlockProcessor:
                     try:
                         _to_put.append((tx_hash, bytes.fromhex(await self.daemon.getrawtransaction(hh))))
                     except (TypeError, RPCError):
-                        self.logger.warning("failed to get a mempool tx, reorg underway?")
+                        self.log.warning("failed to get a mempool tx, reorg underway?")
                         return
             if current_mempool:
                 if bytes.fromhex(await self.daemon.getbestblockhash())[::-1] != self.coin.header_hash(self.db.headers[-1]):
@@ -243,17 +228,17 @@ class BlockProcessor:
                     start = time.perf_counter()
                     start_count = self.tx_count
                     txo_count = await self.run_in_thread_with_lock(self.advance_block, block)
-                    self.logger.info(
+                    self.log.info(
                         "writer advanced to %i (%i txs, %i txos) in %0.3fs", self.height, self.tx_count - start_count,
                         txo_count, time.perf_counter() - start
                     )
                     if self.height == self.coin.nExtendedClaimExpirationForkHeight:
-                        self.logger.warning(
+                        self.log.warning(
                             "applying extended claim expiration fork on claims accepted by, %i", self.height
                         )
                         await self.run_in_thread_with_lock(self.db.apply_expiration_extension_fork)
             except:
-                self.logger.exception("advance blocks failed")
+                self.log.exception("advance blocks failed")
                 raise
             processed_time = time.perf_counter() - total_start
             self.block_count_metric.set(self.height)
@@ -271,29 +256,29 @@ class BlockProcessor:
                 if self.db.get_block_hash(height)[::-1].hex() == block_hash:
                     break
                 count += 1
-            self.logger.warning(f"blockchain reorg detected at {self.height}, unwinding last {count} blocks")
+            self.log.warning(f"blockchain reorg detected at {self.height}, unwinding last {count} blocks")
             try:
                 assert count > 0, count
                 for _ in range(count):
                     await self.run_in_thread_with_lock(self.backup_block)
-                    self.logger.info(f'backed up to height {self.height:,d}')
+                    self.log.info(f'backed up to height {self.height:,d}')
 
                     if self.env.cache_all_claim_txos:
                         await self.db._read_claim_txos()  # TODO: don't do this
                 await self.prefetcher.reset_height(self.height)
                 self.reorg_count_metric.inc()
             except:
-                self.logger.exception("reorg blocks failed")
+                self.log.exception("reorg blocks failed")
                 raise
             finally:
-                self.logger.info("backed up to block %i", self.height)
+                self.log.info("backed up to block %i", self.height)
         else:
             # It is probably possible but extremely rare that what
             # bitcoind returns doesn't form a chain because it
             # reorg-ed the chain as it was processing the batched
             # block hash requests.  Should this happen it's simplest
             # just to reset the prefetcher and try again.
-            self.logger.warning('daemon blocks do not form a chain; '
+            self.log.warning('daemon blocks do not form a chain; '
                                 'resetting the prefetcher')
             await self.prefetcher.reset_height(self.height)
 
@@ -365,7 +350,7 @@ class BlockProcessor:
                     # else:
                     #     print("\tfailed to validate signed claim")
             except:
-                self.logger.exception(f"error validating channel signature for %s:%i", tx_hash[::-1].hex(), nout)
+                self.log.exception(f"error validating channel signature for %s:%i", tx_hash[::-1].hex(), nout)
 
         if txo.is_claim:  # it's a root claim
             root_tx_num, root_idx = tx_num, nout
@@ -375,7 +360,7 @@ class BlockProcessor:
                 # print(f"\tthis is a wonky tx, contains unlinked claim update {claim_hash.hex()}")
                 return
             if normalized_name != spent_claims[claim_hash][2]:
-                self.logger.warning(
+                self.log.warning(
                     f"{tx_hash[::-1].hex()} contains mismatched name for claim update {claim_hash.hex()}"
                 )
                 return
@@ -1280,7 +1265,7 @@ class BlockProcessor:
         self.touched_claims_to_send_es.difference_update(self.removed_claim_hashes)
         self.removed_claims_to_send_es.update(self.removed_claim_hashes)
 
-    def advance_block(self, block):
+    def advance_block(self, block: Block):
         height = self.height + 1
         # print("advance ", height)
         # Use local vars for speed in the loops
@@ -1454,7 +1439,7 @@ class BlockProcessor:
         self.removed_claims_to_send_es.update(touched_and_deleted.deleted_claims)
 
         # self.db.assert_flushed(self.flush_data())
-        self.logger.info("backup block %i", self.height)
+        self.log.info("backup block %i", self.height)
         # Check and update self.tip
 
         self.db.tx_counts.pop()
@@ -1507,7 +1492,7 @@ class BlockProcessor:
         self.db.assert_db_state()
 
         elapsed = self.db.last_flush - start_time
-        self.logger.warning(f'backup flush #{self.db.hist_flush_count:,d} took {elapsed:.1f}s. '
+        self.log.warning(f'backup flush #{self.db.hist_flush_count:,d} took {elapsed:.1f}s. '
                             f'Height {self.height:,d} txs: {self.tx_count:,d} ({tx_delta:+,d})')
 
     def add_utxo(self, tx_hash: bytes, tx_num: int, nout: int, txout: 'TxOutput') -> Optional[bytes]:
@@ -1535,7 +1520,7 @@ class BlockProcessor:
             hashX = hashX_value.hashX
             utxo_value = self.db.prefix_db.utxo.get(hashX, txin_num, nout)
             if not utxo_value:
-                self.logger.warning(
+                self.log.warning(
                     "%s:%s is not found in UTXO db for %s", hash_to_hex_str(tx_hash), nout, hash_to_hex_str(hashX)
                 )
                 raise ChainError(
@@ -1551,8 +1536,9 @@ class BlockProcessor:
             self.touched_hashXs.add(hashX)
             return hashX
 
-    async def process_blocks_and_mempool_forever(self):
+    async def process_blocks_and_mempool_forever(self, caught_up_event):
         """Loop forever processing blocks as they arrive."""
+        self._caught_up_event = caught_up_event
         try:
             while not self._stopping:
                 if self.height == self.daemon.cached_height():
@@ -1573,7 +1559,7 @@ class BlockProcessor:
                     except asyncio.CancelledError:
                         raise
                     except Exception:
-                        self.logger.exception("error while updating mempool txs")
+                        self.log.exception("error while updating mempool txs")
                         raise
                 else:
                     try:
@@ -1581,13 +1567,13 @@ class BlockProcessor:
                     except asyncio.CancelledError:
                         raise
                     except Exception:
-                        self.logger.exception("error while processing txs")
+                        self.log.exception("error while processing txs")
                         raise
         finally:
             self._ready_to_stop.set()
 
     async def _first_caught_up(self):
-        self.logger.info(f'caught up to height {self.height}')
+        self.log.info(f'caught up to height {self.height}')
         # Flush everything but with first_sync->False state.
         first_sync = self.db.first_sync
         self.db.first_sync = False
@@ -1601,86 +1587,19 @@ class BlockProcessor:
         await self.run_in_thread_with_lock(flush)
 
         if first_sync:
-            self.logger.info(f'{__version__} synced to '
+            self.log.info(f'{__version__} synced to '
                              f'height {self.height:,d}, halting here.')
             self.shutdown_event.set()
 
-    async def open(self):
-        self.db.open_db()
+    def _iter_start_tasks(self):
         self.height = self.db.db_height
         self.tip = self.db.db_tip
         self.tx_count = self.db.db_tx_count
-        await self.db.initialize_caches()
+        yield self.daemon.height()
+        yield self.start_cancellable(self.prefetcher.main_loop, self.height)
+        yield self.start_cancellable(self.process_blocks_and_mempool_forever)
 
-    async def fetch_and_process_blocks(self, caught_up_event):
-        """Fetch, process and index blocks from the daemon.
-
-        Sets caught_up_event when first caught up.  Flushes to disk
-        and shuts down cleanly if cancelled.
-
-        This is mainly because if, during initial sync ElectrumX is
-        asked to shut down when a large number of blocks have been
-        processed but not written to disk, it should write those to
-        disk before exiting, as otherwise a significant amount of work
-        could be lost.
-        """
-
-        await self.open()
-
-        self._caught_up_event = caught_up_event
-        try:
-            await asyncio.wait([
-                self.prefetcher.main_loop(self.height),
-                self.process_blocks_and_mempool_forever()
-            ])
-        except asyncio.CancelledError:
-            raise
-        except:
-            self.logger.exception("Block processing failed!")
-            raise
-        finally:
-            # Shut down block processing
-            self.logger.info('closing the DB for a clean shutdown...')
-            self._chain_executor.shutdown(wait=True)
-            self.db.close()
-
-    async def start(self):
-        self._stopping = False
-        env = self.env
-        self.logger.info(f'software version: {__version__}')
-        self.logger.info(f'event loop policy: {env.loop_policy}')
-        self.logger.info(f'reorg limit is {env.reorg_limit:,d} blocks')
-
-        await self.daemon.height()
-
-        def _start_cancellable(run, *args):
-            _flag = asyncio.Event()
-            self.cancellable_tasks.append(asyncio.ensure_future(run(*args, _flag)))
-            return _flag.wait()
-
-        await _start_cancellable(self.fetch_and_process_blocks)
-
-    async def stop(self):
-        self._stopping = True
-        await self._ready_to_stop.wait()
-        for task in reversed(self.cancellable_tasks):
-            task.cancel()
-        await asyncio.wait(self.cancellable_tasks)
-        self.shutdown_event.set()
-        await self.daemon.close()
-
-    def run(self):
-        loop = asyncio.get_event_loop()
-        loop.set_default_executor(self._chain_executor)
-
-        def __exit():
-            raise SystemExit()
-        try:
-            loop.add_signal_handler(signal.SIGINT, __exit)
-            loop.add_signal_handler(signal.SIGTERM, __exit)
-            loop.run_until_complete(self.start())
-            loop.run_until_complete(self.shutdown_event.wait())
-        except (SystemExit, KeyboardInterrupt):
-            pass
-        finally:
-            loop.run_until_complete(self.stop())
+    def _iter_stop_tasks(self):
+        yield self._ready_to_stop.wait()
+        yield self._stop_cancellable_tasks()
+        yield self.daemon.close()

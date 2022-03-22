@@ -12,11 +12,11 @@ from bisect import bisect_right
 from asyncio import Event, sleep
 from collections import defaultdict, namedtuple
 from contextlib import suppress
-from functools import partial, lru_cache
+from functools import partial
 from elasticsearch import ConnectionTimeout
 from prometheus_client import Counter, Info, Histogram, Gauge
 from scribe.schema.result import Outputs
-from scribe.base58 import Base58Error
+from scribe.schema.base58 import Base58Error
 from scribe.error import ResolveCensoredError, TooManyClaimSearchParametersError
 from scribe import __version__, PROTOCOL_MIN, PROTOCOL_MAX, PROMETHEUS_NAMESPACE
 from scribe.build_info import BUILD, COMMIT_HASH, DOCKER_TAG

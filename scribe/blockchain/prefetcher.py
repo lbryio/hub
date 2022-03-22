@@ -34,9 +34,10 @@ class Prefetcher:
         self.ave_size = self.min_cache_size // 10
         self.polling_delay = 0.5
 
-    async def main_loop(self, bp_height):
+    async def main_loop(self, bp_height, started: asyncio.Event):
         """Loop forever polling for more blocks."""
         await self.reset_height(bp_height)
+        started.set()
         try:
             while True:
                 # Sleep a while if there is nothing to prefetch

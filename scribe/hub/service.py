@@ -1,13 +1,15 @@
 import asyncio
 from scribe.blockchain.daemon import LBCDaemon
-from scribe.reader import BaseBlockchainReader
-from scribe.elasticsearch import ElasticNotifierClientProtocol
+
 from scribe.hub.session import SessionManager
 from scribe.hub.mempool import MemPool
 from scribe.hub.udp import StatusServer
 
+from scribe.service import BlockchainReaderService
+from scribe.elasticsearch import ElasticNotifierClientProtocol
 
-class BlockchainReaderServer(BaseBlockchainReader):
+
+class HubServerService(BlockchainReaderService):
     def __init__(self, env):
         super().__init__(env, 'lbry-reader', thread_workers=max(1, env.max_query_workers), thread_prefix='hub-worker')
         self.notifications_to_send = []
@@ -89,11 +91,11 @@ class BlockchainReaderServer(BaseBlockchainReader):
 
     def _iter_start_tasks(self):
         yield self.start_status_server()
-        yield self._start_cancellable(self.es_notification_client.maintain_connection)
-        yield self._start_cancellable(self.receive_es_notifications)
-        yield self._start_cancellable(self.refresh_blocks_forever)
+        yield self.start_cancellable(self.es_notification_client.maintain_connection)
+        yield self.start_cancellable(self.receive_es_notifications)
+        yield self.start_cancellable(self.refresh_blocks_forever)
         yield self.session_manager.search_index.start()
-        yield self._start_cancellable(self.session_manager.serve, self.mempool)
+        yield self.start_cancellable(self.session_manager.serve, self.mempool)
 
     def _iter_stop_tasks(self):
         yield self.status_server.stop()

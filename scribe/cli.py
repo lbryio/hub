@@ -2,8 +2,9 @@ import logging
 import traceback
 import argparse
 from scribe.env import Env
-from scribe.blockchain.block_processor import BlockProcessor
-from scribe.reader import BlockchainReaderServer, ElasticWriter
+from scribe.blockchain.service import BlockchainProcessorService
+from scribe.hub.service import HubServerService
+from scribe.elasticsearch.service import ElasticSyncService
 
 
 def get_arg_parser(name):
@@ -24,7 +25,7 @@ def run_writer_forever():
     setup_logging()
     args = get_arg_parser('scribe').parse_args()
     try:
-        block_processor = BlockProcessor(Env.from_arg_parser(args))
+        block_processor = BlockchainProcessorService(Env.from_arg_parser(args))
         block_processor.run()
     except Exception:
         traceback.print_exc()
@@ -38,7 +39,7 @@ def run_server_forever():
     args = get_arg_parser('scribe-hub').parse_args()
 
     try:
-        server = BlockchainReaderServer(Env.from_arg_parser(args))
+        server = HubServerService(Env.from_arg_parser(args))
         server.run()
     except Exception:
         traceback.print_exc()
@@ -54,7 +55,7 @@ def run_es_sync_forever():
     args = parser.parse_args()
 
     try:
-        server = ElasticWriter(Env.from_arg_parser(args))
+        server = ElasticSyncService(Env.from_arg_parser(args))
         server.run(args.reindex)
     except Exception:
         traceback.print_exc()

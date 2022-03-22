@@ -1,5 +1,7 @@
 FROM debian:11-slim
 
+STOPSIGNAL SIGINT
+
 ARG user=lbry
 ARG db_dir=/database
 ARG projects_dir=/home/$user
@@ -49,5 +51,5 @@ ENV MAX_SEND=1000000000000000000
 ENV MAX_RECEIVE=1000000000000000000
 
 
-COPY ./docker/wallet_server_entrypoint.sh /entrypoint.sh
+COPY ./docker/scribe_entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

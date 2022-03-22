@@ -2,25 +2,22 @@ import os
 import json
 import typing
 import asyncio
-import logging
 from collections import defaultdict
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch.helpers import async_streaming_bulk
 
 from scribe.schema.result import Censor
+from scribe.service import BlockchainReaderService
+from scribe.db.revertable import RevertableOp
+from scribe.db.common import TrendingNotification, DB_PREFIXES
+
 from scribe.elasticsearch.notifier_protocol import ElasticNotifierProtocol
 from scribe.elasticsearch.search import IndexVersionMismatch, expand_query
 from scribe.elasticsearch.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
 from scribe.elasticsearch.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
-from scribe.reader import BaseBlockchainReader
-from scribe.db.revertable import RevertableOp
-from scribe.db.common import TrendingNotification, DB_PREFIXES
 
 
-log = logging.getLogger(__name__)
-
-
-class ElasticWriter(BaseBlockchainReader):
+class ElasticSyncService(BlockchainReaderService):
     VERSION = 1
 
     def __init__(self, env):
@@ -342,10 +339,10 @@ class ElasticWriter(BaseBlockchainReader):
     def _iter_start_tasks(self):
         yield self.read_es_height()
         yield self.start_index()
-        yield self._start_cancellable(self.run_es_notifier)
+        yield self.start_cancellable(self.run_es_notifier)
         yield self.reindex(force=self._force_reindex)
         yield self.catch_up()
-        yield self._start_cancellable(self.refresh_blocks_forever)
+        yield self.start_cancellable(self.refresh_blocks_forever)
 
     def _iter_stop_tasks(self):
         yield self._stop_cancellable_tasks()
@@ -363,7 +360,7 @@ class ElasticWriter(BaseBlockchainReader):
             self._force_reindex = False
 
     async def _reindex(self):
-        async with self._lock:
+        async with self.lock:
             self.log.info("reindexing %i claims (estimate)", self.db.prefix_db.claim_to_txo.estimate_num_keys())
             await self.delete_index()
             res = await self.sync_client.indices.create(self.index, INDEX_DEFAULT_SETTINGS, ignore=400)

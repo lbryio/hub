@@ -1,12 +1,12 @@
 Scribe maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the [LBRY blockchain](https://github.com/lbryio/lbrycrd) and provides an interface for python based services that utilize the blockchain data in an ongoing manner. Scribe includes implementations of this interface to provide an electrum server for thin-wallet clients (such as lbry-sdk) and to maintain an elasticsearch database of metadata for claims in the LBRY blockchain.
 
- * Uses Python 3.7-3.8
+ * Uses Python 3.7-3.9 (3.10 probably works but hasn't yet been tested)
  * Protobuf schema for encoding and decoding metadata stored on the blockchain ([scribe.schema](https://github.com/lbryio/scribe/tree/master/scribe/schema)).
- * Blockchain processor that maintains an up to date rocksdb database ([scribe.blockchain](https://github.com/lbryio/scribe/tree/master/scribe/blockchain))
- * Rocksdb based database containing the blockchain data ([scribe.db](https://github.com/lbryio/scribe/tree/master/scribe/db))
- * Interface for python services to implement in order for them maintain a read only view of the blockchain data ([scribe.reader.interface](https://github.com/lbryio/scribe/tree/master/scribe/reader/interface.py))
- * Electrum based server for thin-wallet clients like lbry-sdk ([scribe.reader.hub_server](https://github.com/lbryio/scribe/tree/master/scribe/reader/hub_server.py))
- * Elasticsearch sync utility to index all the claim metadata in the blockchain into an easily searchable form ([scribe.reader.elastic_sync](https://github.com/lbryio/scribe/tree/master/scribe/reader/elastic_sync.py))
+ * Blockchain processor that maintains an up to date rocksdb database ([scribe.blockchain.service](https://github.com/lbryio/scribe/tree/master/scribe/blockchain/service.py))
+ * [Rocksdb](https://github.com/lbryio/lbry-rocksdb/) based database containing the blockchain data ([scribe.db](https://github.com/lbryio/scribe/tree/master/scribe/db))
+ * Interface for python services to implement in order for them maintain a read only view of the blockchain data ([scribe.service](https://github.com/lbryio/scribe/tree/master/scribe/service.py))
+ * Electrum based server for thin-wallet clients like lbry-sdk ([scribe.hub.service](https://github.com/lbryio/scribe/tree/master/scribe/hub/service.py))
+ * Elasticsearch sync utility to index all the claim metadata in the blockchain into an easily searchable form ([scribe.elasticsearch.service](https://github.com/lbryio/scribe/tree/master/scribe/elasticsearch/service.py))
 
 
 ## Installation
