@@ -336,7 +336,24 @@ class ElasticSyncService(BlockchainReaderService):
                 self.log.info("reindex (last wrote: %i, db height: %i)", self._last_wrote_height, self.db.db_height)
             await self._reindex()
 
+    async def block_bulk_sync_on_writer_catchup(self):
+        def _check_if_catching_up():
+            self.db.prefix_db.try_catch_up_with_primary()
+            state = self.db.prefix_db.db_state.get()
+            return state.catching_up
+
+        loop = asyncio.get_event_loop()
+
+        catching_up = True
+        while catching_up:
+            catching_up = await loop.run_in_executor(self._executor, _check_if_catching_up)
+            if catching_up:
+                await asyncio.sleep(1)
+            else:
+                return
+
     def _iter_start_tasks(self):
+        yield self.block_bulk_sync_on_writer_catchup()
         yield self.read_es_height()
         yield self.start_index()
         yield self.start_cancellable(self.run_es_notifier)

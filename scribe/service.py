@@ -140,6 +140,7 @@ class BlockchainReaderService(BlockchainService):
         super().__init__(env, secondary_name, thread_workers, thread_prefix)
         self._refresh_interval = 0.1
         self.prometheus_server: typing.Optional[PrometheusServer] = None
+        self.finished_initial_catch_up = asyncio.Event()
 
     async def poll_for_changes(self):
         """
@@ -233,6 +234,8 @@ class BlockchainReaderService(BlockchainService):
             try:
                 async with self.lock:
                     await self.poll_for_changes()
+                    if not self.db.catching_up and not self.finished_initial_catch_up.is_set():
+                        self.finished_initial_catch_up.set()
             except asyncio.CancelledError:
                 raise
             except:

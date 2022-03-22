@@ -422,7 +422,7 @@ class DBState(typing.NamedTuple):
     tip: bytes
     utxo_flush_count: int
     wall_time: int
-    first_sync: bool
+    catching_up: bool
     db_version: int
     hist_flush_count: int
     comp_flush_count: int
@@ -1439,11 +1439,11 @@ class DBStatePrefixRow(PrefixRow):
 
     @classmethod
     def pack_value(cls, genesis: bytes, height: int, tx_count: int, tip: bytes, utxo_flush_count: int, wall_time: int,
-                   first_sync: bool, db_version: int, hist_flush_count: int, comp_flush_count: int,
+                   catching_up: bool, db_version: int, hist_flush_count: int, comp_flush_count: int,
                    comp_cursor: int, es_sync_height: int) -> bytes:
         return super().pack_value(
             genesis, height, tx_count, tip, utxo_flush_count,
-            wall_time, 1 if first_sync else 0, db_version, hist_flush_count,
+            wall_time, 1 if catching_up else 0, db_version, hist_flush_count,
             comp_flush_count, comp_cursor, es_sync_height
         )
 
@@ -1457,10 +1457,10 @@ class DBStatePrefixRow(PrefixRow):
 
     @classmethod
     def pack_item(cls, genesis: bytes, height: int, tx_count: int, tip: bytes, utxo_flush_count: int, wall_time: int,
-                  first_sync: bool, db_version: int, hist_flush_count: int, comp_flush_count: int,
+                  catching_up: bool, db_version: int, hist_flush_count: int, comp_flush_count: int,
                   comp_cursor: int, es_sync_height: int):
         return cls.pack_key(), cls.pack_value(
-            genesis, height, tx_count, tip, utxo_flush_count, wall_time, first_sync, db_version, hist_flush_count,
+            genesis, height, tx_count, tip, utxo_flush_count, wall_time, catching_up, db_version, hist_flush_count,
             comp_flush_count, comp_cursor, es_sync_height
         )
 

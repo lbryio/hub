@@ -92,8 +92,9 @@ class HubServerService(BlockchainReaderService):
     def _iter_start_tasks(self):
         yield self.start_status_server()
         yield self.start_cancellable(self.es_notification_client.maintain_connection)
-        yield self.start_cancellable(self.receive_es_notifications)
         yield self.start_cancellable(self.refresh_blocks_forever)
+        yield self.finished_initial_catch_up.wait()
+        yield self.start_cancellable(self.receive_es_notifications)
         yield self.session_manager.search_index.start()
         yield self.start_cancellable(self.session_manager.serve, self.mempool)
 

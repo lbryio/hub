@@ -1045,10 +1045,10 @@ class HubDB:
         if self.db_height > 0:
             self.prefix_db.db_state.stage_delete((), self.prefix_db.db_state.get())
         self.prefix_db.db_state.stage_put((), (
-                self.genesis_bytes, self.db_height, self.db_tx_count, self.db_tip,
-                self.utxo_flush_count, int(self.wall_time), self.first_sync, self.db_version,
-                self.hist_flush_count, self.hist_comp_flush_count, self.hist_comp_cursor,
-                self.es_sync_height
+            self.genesis_bytes, self.db_height, self.db_tx_count, self.db_tip,
+            self.utxo_flush_count, int(self.wall_time), self.catching_up, self.db_version,
+            self.hist_flush_count, self.hist_comp_flush_count, self.hist_comp_cursor,
+            self.es_sync_height
             )
         )
 
@@ -1062,7 +1062,7 @@ class HubDB:
             self.db_version = max(self.DB_VERSIONS)
             self.utxo_flush_count = 0
             self.wall_time = 0
-            self.first_sync = True
+            self.catching_up = True
             self.hist_flush_count = 0
             self.hist_comp_flush_count = -1
             self.hist_comp_cursor = -1
@@ -1083,7 +1083,7 @@ class HubDB:
             self.db_tip = state.tip
             self.utxo_flush_count = state.utxo_flush_count
             self.wall_time = state.wall_time
-            self.first_sync = state.first_sync
+            self.catching_up = state.catching_up
             self.hist_flush_count = state.hist_flush_count
             self.hist_comp_flush_count = state.comp_flush_count
             self.hist_comp_cursor = state.comp_cursor
@@ -1097,7 +1097,7 @@ class HubDB:
         assert self.db_height == state.height, f"{self.db_height} != {state.height}"
         assert self.db_tx_count == state.tx_count, f"{self.db_tx_count} != {state.tx_count}"
         assert self.db_tip == state.tip, f"{self.db_tip} != {state.tip}"
-        assert self.first_sync == state.first_sync, f"{self.first_sync} != {state.first_sync}"
+        assert self.catching_up == state.catching_up, f"{self.catching_up} != {state.catching_up}"
         assert self.es_sync_height == state.es_sync_height, f"{self.es_sync_height} != {state.es_sync_height}"
 
     async def all_utxos(self, hashX):

@@ -1540,10 +1540,12 @@ class BlockchainProcessorService(BlockchainService):
         """Loop forever processing blocks as they arrive."""
         self._caught_up_event = caught_up_event
         try:
+            if self.height != self.daemon.cached_height() and not self.db.catching_up:
+                await self._need_catch_up()  # tell the readers that we're still catching up with lbrycrd/lbcd
             while not self._stopping:
                 if self.height == self.daemon.cached_height():
                     if not self._caught_up_event.is_set():
-                        await self._first_caught_up()
+                        await self._finished_initial_catch_up()
                         self._caught_up_event.set()
                 try:
                     await asyncio.wait_for(self.blocks_event.wait(), self.wait_for_blocks_duration)
@@ -1558,25 +1560,27 @@ class BlockchainProcessorService(BlockchainService):
                         await self.refresh_mempool()
                     except asyncio.CancelledError:
                         raise
-                    except Exception:
-                        self.log.exception("error while updating mempool txs")
-                        raise
+                    except Exception as err:
+                        self.log.exception("error while updating mempool txs: %s", err)
+                        raise err
                 else:
                     try:
                         await self.check_and_advance_blocks(blocks)
                     except asyncio.CancelledError:
                         raise
-                    except Exception:
-                        self.log.exception("error while processing txs")
-                        raise
+                    except Exception as err:
+                        self.log.exception("error while processing txs: %s", err)
+                        raise err
+        except asyncio.CancelledError:
+            raise
+        except Exception as err:
+            self.log.exception("error in block processor loop: %s", err)
+            raise err
         finally:
             self._ready_to_stop.set()
 
-    async def _first_caught_up(self):
-        self.log.info(f'caught up to height {self.height}')
-        # Flush everything but with first_sync->False state.
-        first_sync = self.db.first_sync
-        self.db.first_sync = False
+    async def _need_catch_up(self):
+        self.db.catching_up = True
 
         def flush():
             assert len(self.db.prefix_db._op_stack) == 0
@@ -1586,10 +1590,18 @@ class BlockchainProcessorService(BlockchainService):
 
         await self.run_in_thread_with_lock(flush)
 
-        if first_sync:
-            self.log.info(f'{__version__} synced to '
-                             f'height {self.height:,d}, halting here.')
-            self.shutdown_event.set()
+    async def _finished_initial_catch_up(self):
+        self.log.info(f'caught up to height {self.height}')
+        # Flush everything but with catching_up->False state.
+        self.db.catching_up = False
+
+        def flush():
+            assert len(self.db.prefix_db._op_stack) == 0
+            self.db.write_db_state()
+            self.db.prefix_db.unsafe_commit()
+            self.db.assert_db_state()
+
+        await self.run_in_thread_with_lock(flush)
 
     def _iter_start_tasks(self):
         self.height = self.db.db_height
