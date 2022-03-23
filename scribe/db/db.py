@@ -1103,13 +1103,11 @@ class HubDB:
     async def all_utxos(self, hashX):
         """Return all UTXOs for an address sorted in no particular order."""
         def read_utxos():
-            utxos = []
-            utxos_append = utxos.append
             fs_tx_hash = self.fs_tx_hash
-            for k, v in self.prefix_db.utxo.iterate(prefix=(hashX, )):
-                tx_hash, height = fs_tx_hash(k.tx_num)
-                utxos_append(UTXO(k.tx_num, k.nout, tx_hash, height, v.amount))
-            return utxos
+            utxo_info = [
+                (k.tx_num, k.nout, v.amount) for k, v in self.prefix_db.utxo.iterate(prefix=(hashX, ))
+            ]
+            return [UTXO(tx_num, nout, *fs_tx_hash(tx_num), value=value) for (tx_num, nout, value) in utxo_info]
 
         while True:
             utxos = await asyncio.get_event_loop().run_in_executor(self._executor, read_utxos)
@@ -1117,7 +1115,7 @@ class HubDB:
                 return utxos
             self.logger.warning(f'all_utxos: tx hash not '
                                 f'found (reorg?), retrying...')
-            await sleep(0.25)
+            await asyncio.sleep(0.25)
 
     async def lookup_utxos(self, prevouts):
         def lookup_utxos():

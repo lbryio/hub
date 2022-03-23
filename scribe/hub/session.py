@@ -652,7 +652,6 @@ class LBRYElectrumX(asyncio.Protocol):
 
     MAX_CHUNK_SIZE = 40960
     session_counter = itertools.count()
-    request_handlers: typing.Dict[str, typing.Callable] = {}
     RESPONSE_TIMES = Histogram("response_time", "Response times", namespace=NAMESPACE,
                                labelnames=("method", "version"), buckets=HISTOGRAM_BUCKETS)
     NOTIFICATION_COUNT = Counter("notification", "Number of notifications sent (for subscriptions)",
@@ -885,6 +884,10 @@ class LBRYElectrumX(asyncio.Protocol):
                 coro = self.address_subscribe
             elif method == 'blockchain.address.unsubscribe':
                 coro = self.address_unsubscribe
+            elif method == 'blockchain.address.listunspent':
+                coro = self.address_listunspent
+            elif method == 'blockchain.address.getbalance':
+                coro = self.address_get_balance
             elif method == 'blockchain.estimatefee':
                 coro = self.estimatefee
             elif method == 'blockchain.relayfee':
@@ -1351,19 +1354,22 @@ class LBRYElectrumX(asyncio.Protocol):
             self.session_manager.mempool_statuses.pop(hashX, None)
         return status
 
-    # async def hashX_listunspent(self, hashX):
-    #     """Return the list of UTXOs of a script hash, including mempool
-    #     effects."""
-    #     utxos = await self.db.all_utxos(hashX)
-    #     utxos = sorted(utxos)
-    #     utxos.extend(await self.mempool.unordered_UTXOs(hashX))
-    #     spends = await self.mempool.potential_spends(hashX)
-    #
-    #     return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
-    #              'tx_pos': utxo.tx_pos,
-    #              'height': utxo.height, 'value': utxo.value}
-    #             for utxo in utxos
-    #             if (utxo.tx_hash, utxo.tx_pos) not in spends]
+    async def hashX_listunspent(self, hashX: bytes):
+        """Return the list of UTXOs of a script hash, including mempool
+        effects."""
+        utxos = await self.db.all_utxos(hashX)
+        utxos = sorted(utxos)
+        utxos.extend(self.mempool.unordered_UTXOs(hashX))
+        spends = self.mempool.potential_spends(hashX)
+
+        return [{'tx_hash': hash_to_hex_str(utxo.tx_hash),
+                 'tx_pos': utxo.tx_pos,
+                 'height': utxo.height, 'value': utxo.value}
+                for utxo in utxos
+                if (utxo.tx_hash, utxo.tx_pos) not in spends]
+
+    async def address_listunspent(self, address: str):
+        return await self.hashX_listunspent(self.address_to_hashX(address))
 
     async def hashX_subscribe(self, hashX, alias):
         self.hashX_subs[hashX] = alias
@@ -1386,10 +1392,10 @@ class LBRYElectrumX(asyncio.Protocol):
             pass
         raise RPCError(BAD_REQUEST, f'{address} is not a valid address')
 
-    # async def address_get_balance(self, address):
-    #     """Return the confirmed and unconfirmed balance of an address."""
-    #     hashX = self.address_to_hashX(address)
-    #     return await self.get_balance(hashX)
+    async def address_get_balance(self, address):
+        """Return the confirmed and unconfirmed balance of an address."""
+        hashX = self.address_to_hashX(address)
+        return await self.get_balance(hashX)
 
     async def address_get_history(self, address):
         """Return the confirmed and unconfirmed history of an address."""
@@ -1425,11 +1431,11 @@ class LBRYElectrumX(asyncio.Protocol):
         hashX = self.address_to_hashX(address)
         return await self.hashX_unsubscribe(hashX, address)
 
-    # async def get_balance(self, hashX):
-    #     utxos = await self.db.all_utxos(hashX)
-    #     confirmed = sum(utxo.value for utxo in utxos)
-    #     unconfirmed = await self.mempool.balance_delta(hashX)
-    #     return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
+    async def get_balance(self, hashX):
+        utxos = await self.db.all_utxos(hashX)
+        confirmed = sum(utxo.value for utxo in utxos)
+        unconfirmed = self.mempool.balance_delta(hashX)
+        return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
     # async def scripthash_get_balance(self, scripthash):
     #     """Return the confirmed and unconfirmed balance of a scripthash."""

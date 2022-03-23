@@ -9,6 +9,7 @@ from prometheus_client import Histogram
 import rocksdb.errors
 from scribe import PROMETHEUS_NAMESPACE
 from scribe.common import HISTOGRAM_BUCKETS
+from scribe.db.common import UTXO
 from scribe.blockchain.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
@@ -145,6 +146,44 @@ class MemPool:
             has_ui = any(hash in self.txs for hash, idx in tx.in_pairs)
             result.append(MemPoolTxSummary(tx_hash, tx.fee, has_ui))
         return result
+
+    def unordered_UTXOs(self, hashX):
+        """Return an unordered list of UTXO named tuples from mempool
+        transactions that pay to hashX.
+        This does not consider if any other mempool transactions spend
+        the outputs.
+        """
+        utxos = []
+        for tx_hash in self.touched_hashXs.get(hashX, ()):
+            tx = self.txs.get(tx_hash)
+            for pos, (hX, value) in enumerate(tx.out_pairs):
+                if hX == hashX:
+                    utxos.append(UTXO(-1, pos, tx_hash, 0, value))
+        return utxos
+
+    def potential_spends(self, hashX):
+        """Return a set of (prev_hash, prev_idx) pairs from mempool
+        transactions that touch hashX.
+        None, some or all of these may be spends of the hashX, but all
+        actual spends of it (in the DB or mempool) will be included.
+        """
+        result = set()
+        for tx_hash in self.touched_hashXs.get(hashX, ()):
+            tx = self.txs[tx_hash]
+            result.update(tx.prevouts)
+        return result
+
+    def balance_delta(self, hashX):
+        """Return the unconfirmed amount in the mempool for hashX.
+        Can be positive or negative.
+        """
+        value = 0
+        if hashX in self.touched_hashXs:
+            for h in self.touched_hashXs[hashX]:
+                tx = self.txs[h]
+                value -= sum(v for h168, v in tx.in_pairs if h168 == hashX)
+                value += sum(v for h168, v in tx.out_pairs if h168 == hashX)
+        return value
 
     def get_mempool_height(self, tx_hash: bytes) -> int:
         # Height Progression
