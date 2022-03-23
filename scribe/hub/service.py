@@ -100,6 +100,7 @@ class HubServerService(BlockchainReaderService):
         yield self.start_cancellable(self.session_manager.serve, self.mempool)
 
     def _iter_stop_tasks(self):
+        yield self.stop_prometheus()
         yield self.status_server.stop()
         yield self._stop_cancellable_tasks()
         yield self.session_manager.search_index.stop()
