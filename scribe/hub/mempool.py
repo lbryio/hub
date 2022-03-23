@@ -5,6 +5,8 @@ import typing
 import logging
 from collections import defaultdict
 from prometheus_client import Histogram
+
+import rocksdb.errors
 from scribe import PROMETHEUS_NAMESPACE
 from scribe.common import HISTOGRAM_BUCKETS
 from scribe.blockchain.transaction.deserializer import Deserializer
@@ -53,9 +55,17 @@ class MemPool:
 
     def refresh(self) -> typing.Set[bytes]:  # returns list of new touched hashXs
         prefix_db = self._db.prefix_db
-        new_mempool = {k.tx_hash: v.raw_tx for k, v in prefix_db.mempool_tx.iterate()}  # TODO: make this more efficient
-        self.raw_mempool.clear()
-        self.raw_mempool.update(new_mempool)
+        try:
+            new_mempool = {k.tx_hash: v.raw_tx for k, v in prefix_db.mempool_tx.iterate()}  # TODO: make this more efficient
+        except rocksdb.errors.RocksIOError as err:
+            # FIXME: why does this happen? can it happen elsewhere?
+            if err.args[0].startswith(b'IO error: No such file or directory: While open a file for random read:'):
+                self.logger.error("failed to process mempool, retrying later")
+                return set()
+            raise err
+        else:
+            self.raw_mempool.clear()
+            self.raw_mempool.update(new_mempool)
 
         # hashXs = self.hashXs  # hashX: [tx_hash, ...]
         touched_hashXs = set()

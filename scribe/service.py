@@ -191,9 +191,9 @@ class BlockchainReaderService(BlockchainService):
     def _detect_changes(self):
         try:
             self.db.prefix_db.try_catch_up_with_primary()
-        except:
-            self.log.exception('failed to update secondary db')
-            raise
+        except Exception as err:
+            self.log.exception('failed to update secondary db: %s', err)
+            raise err
         state = self.db.prefix_db.db_state.get()
         if not state or state.height <= 0:
             return
