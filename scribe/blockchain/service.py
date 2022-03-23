@@ -169,8 +169,9 @@ class BlockchainProcessorService(BlockchainService):
 
     async def refresh_mempool(self):
         def fetch_mempool(mempool_prefix):
+            lower, upper = mempool_prefix.MIN_TX_HASH, mempool_prefix.MAX_TX_HASH
             return {
-                k.tx_hash: v.raw_tx for (k, v) in mempool_prefix.iterate()
+                k.tx_hash: v.raw_tx for (k, v) in mempool_prefix.iterate(start=(lower,), stop=(upper,))
             }
 
         def update_mempool(unsafe_commit, mempool_prefix, to_put, to_delete):

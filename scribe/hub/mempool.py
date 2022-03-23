@@ -55,17 +55,20 @@ class MemPool:
 
     def refresh(self) -> typing.Set[bytes]:  # returns list of new touched hashXs
         prefix_db = self._db.prefix_db
+        mempool_tx_hashes = set()
         try:
-            new_mempool = {k.tx_hash: v.raw_tx for k, v in prefix_db.mempool_tx.iterate()}  # TODO: make this more efficient
+            lower, upper = prefix_db.mempool_tx.MIN_TX_HASH, prefix_db.mempool_tx.MAX_TX_HASH
+            for k, v in prefix_db.mempool_tx.iterate(start=(lower,), stop=(upper,)):
+                self.raw_mempool[k.tx_hash] = v.raw_tx
+                mempool_tx_hashes.add(k.tx_hash)
+            for removed_mempool_tx in set(self.raw_mempool.keys()).difference(mempool_tx_hashes):
+                self.raw_mempool.pop(removed_mempool_tx)
         except rocksdb.errors.RocksIOError as err:
             # FIXME: why does this happen? can it happen elsewhere?
             if err.args[0].startswith(b'IO error: No such file or directory: While open a file for random read:'):
                 self.logger.error("failed to process mempool, retrying later")
                 return set()
             raise err
-        else:
-            self.raw_mempool.clear()
-            self.raw_mempool.update(new_mempool)
 
         # hashXs = self.hashXs  # hashX: [tx_hash, ...]
         touched_hashXs = set()

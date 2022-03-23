@@ -1513,6 +1513,9 @@ class MempoolTXPrefixRow(PrefixRow):
     prefix = DB_PREFIXES.mempool_tx.value
     key_struct = struct.Struct(b'>32s')
 
+    MAX_TX_HASH = b'\xff' * 32
+    MIN_TX_HASH = b'\x00' * 32
+
     key_part_lambdas = [
         lambda: b'',
         struct.Struct(b'>32s').pack
