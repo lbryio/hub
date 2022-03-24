@@ -2,6 +2,7 @@ import asyncio
 import json
 import hashlib
 import sys
+import time
 from bisect import bisect_right
 from binascii import hexlify, unhexlify
 from collections import defaultdict
@@ -414,6 +415,8 @@ class ResolveCommand(BaseResolveTestCase):
         uri = 'lbry://@abc/on-channel-claim'
         # now, claim something on this channel (it will update the invalid claim, but we save and forcefully restore)
         valid_claim = await self.stream_create('on-channel-claim', '0.00000001', channel_id=channel['claim_id'])
+        print("sleeeeeeeeeping.....")
+        time.sleep(1)  # FIXME: don't wait for the claim to be saved
         # resolves normally
         response = await self.resolve(uri)
         self.assertTrue(response['is_channel_signature_valid'])
@@ -1584,6 +1587,8 @@ class ResolveAfterReorg(BaseResolveTestCase):
         )
 
         await self.stream_abandon(stream_id)
+        print("Sleeeeeeeping to wait for abandoned stream to be removed")
+        time.sleep(1)
         self.assertNotIn('error', await self.resolve(channel_name))
         self.assertIn('error', await self.resolve(stream_name))
         self.assertEqual(channel_id, (await self.assertMatchWinningClaim(channel_name)).claim_hash.hex())
@@ -1591,12 +1596,16 @@ class ResolveAfterReorg(BaseResolveTestCase):
         # TODO: check @abc/foo too
 
         await self.reorg(206)
+        print("Sleeeeeeeping to wait for reorg")
+        time.sleep(1)
         self.assertNotIn('error', await self.resolve(channel_name))
         self.assertIn('error', await self.resolve(stream_name))
         self.assertEqual(channel_id, (await self.assertMatchWinningClaim(channel_name)).claim_hash.hex())
         await self.assertNoClaimForName(stream_name)
 
         await self.channel_abandon(channel_id)
+        print("Sleeeeeeeping to wait for abandoned channel to be removed")
+        time.sleep(1)
         self.assertIn('error', await self.resolve(channel_name))
         self.assertIn('error', await self.resolve(stream_name))
         await self.reorg(206)
@@ -1644,6 +1653,8 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up and verify the reorg
         await asyncio.wait_for(self.on_header(209), 3.0)
+        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
+        time.sleep(1)
         await self.assertBlockHash(207)
         await self.assertBlockHash(208)
         await self.assertBlockHash(209)
@@ -1673,6 +1684,8 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up
         await asyncio.wait_for(self.on_header(210), 3.0)
+        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
+        time.sleep(1)
 
         # verify the claim is in the new block and that it is returned by claim_search
         republished = await self.resolve('hovercraft')
@@ -1723,6 +1736,8 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up and verify the reorg
         await asyncio.wait_for(self.on_header(209), 30.0)
+        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
+        time.sleep(1)
         await self.assertBlockHash(207)
         await self.assertBlockHash(208)
         await self.assertBlockHash(209)
@@ -1752,6 +1767,8 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up
         await asyncio.wait_for(self.on_header(210), 1.0)
+        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
+        time.sleep(1)
 
         # verify the claim is in the new block and that it is returned by claim_search
         republished = await self.resolve('hovercraft')

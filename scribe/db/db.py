@@ -234,9 +234,7 @@ class HubDB:
             # winning resolution
             controlling = self.get_controlling_claim(normalized_name)
             if not controlling:
-                # print(f"none controlling for lbry://{normalized_name}")
                 return
-            # print(f"resolved controlling lbry://{normalized_name}#{controlling.claim_hash.hex()}")
             return self._fs_get_claim_by_hash(controlling.claim_hash)
 
         amount_order = max(int(amount_order or 1), 1)
