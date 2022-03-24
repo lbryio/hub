@@ -33,6 +33,34 @@ HISTOGRAM_BUCKETS = (
 #         return value
 
 
+class StagedClaimtrieItem(typing.NamedTuple):
+    """
+    Represents a claim TXO, used internally by the block processor
+    """
+    name: str
+    normalized_name: str
+    claim_hash: bytes
+    amount: int
+    expiration_height: int
+    tx_num: int
+    position: int
+    root_tx_num: int
+    root_position: int
+    channel_signature_is_valid: bool
+    signing_hash: typing.Optional[bytes]
+    reposted_claim_hash: typing.Optional[bytes]
+
+    @property
+    def is_update(self) -> bool:
+        return (self.tx_num, self.position) != (self.root_tx_num, self.root_position)
+
+    def invalidate_signature(self) -> 'StagedClaimtrieItem':
+        return StagedClaimtrieItem(
+            self.name, self.normalized_name, self.claim_hash, self.amount, self.expiration_height, self.tx_num,
+            self.position, self.root_tx_num, self.root_position, False, None, self.reposted_claim_hash
+        )
+
+
 def formatted_time(t, sep=' '):
     """Return a number of seconds as a string in days, hours, mins and
     maybe secs."""

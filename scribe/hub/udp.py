@@ -5,7 +5,6 @@ import logging
 from typing import Optional, Tuple, NamedTuple
 from scribe.schema.attrs import country_str_to_int, country_int_to_str
 from scribe.common import LRUCache, is_valid_public_ipv4
-# from prometheus_client import Counter
 
 
 log = logging.getLogger(__name__)

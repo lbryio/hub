@@ -1,10 +1,8 @@
 import asyncio
 from scribe.blockchain.daemon import LBCDaemon
-
 from scribe.hub.session import SessionManager
 from scribe.hub.mempool import MemPool
 from scribe.hub.udp import StatusServer
-
 from scribe.service import BlockchainReaderService
 from scribe.elasticsearch import ElasticNotifierClientProtocol
 

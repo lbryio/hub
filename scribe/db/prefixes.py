@@ -2,8 +2,6 @@ import typing
 import struct
 import array
 import base64
-import rocksdb
-import rocksdb.interfaces
 from typing import Union, Tuple, NamedTuple, Optional
 from scribe.db.common import DB_PREFIXES
 from scribe.db.interface import BasePrefixDB, ROW_TYPES, PrefixRow

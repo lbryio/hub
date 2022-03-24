@@ -5,7 +5,6 @@ import typing
 import logging
 from collections import defaultdict
 from prometheus_client import Histogram
-
 import rocksdb.errors
 from scribe import PROMETHEUS_NAMESPACE
 from scribe.common import HISTOGRAM_BUCKETS

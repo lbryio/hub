@@ -5,12 +5,10 @@ import asyncio
 from collections import defaultdict
 from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch.helpers import async_streaming_bulk
-
 from scribe.schema.result import Censor
 from scribe.service import BlockchainReaderService
 from scribe.db.revertable import RevertableOp
 from scribe.db.common import TrendingNotification, DB_PREFIXES
-
 from scribe.elasticsearch.notifier_protocol import ElasticNotifierProtocol
 from scribe.elasticsearch.search import IndexVersionMismatch, expand_query
 from scribe.elasticsearch.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS

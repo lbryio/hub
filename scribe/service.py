@@ -15,7 +15,7 @@ from scribe.metrics import PrometheusServer
 
 class BlockchainService:
     """
-    Base class for blockchain readers and the writer
+    Base class for blockchain readers as well as the block processor
     """
     def __init__(self, env: Env, secondary_name: str, thread_workers: int = 1, thread_prefix: str = 'scribe'):
         self.env = env
@@ -33,20 +33,6 @@ class BlockchainService:
             filtering_channel_ids=env.filtering_channel_ids, executor=self._executor
         )
         self._stopping = False
-
-    def advance(self, height: int):
-        """
-        Called when advancing to the given block height
-        Callbacks that look up new values from the added block can be put here
-        """
-        raise NotImplementedError()
-
-    def unwind(self):
-        """
-        Go backwards one block
-
-        """
-        raise NotImplementedError()
 
     def start_cancellable(self, run, *args):
         _flag = asyncio.Event()
@@ -178,7 +164,6 @@ class BlockchainReaderService(BlockchainService):
     def unwind(self):
         """
         Go backwards one block
-
         """
         prev_count = self.db.tx_counts.pop()
         tx_count = self.db.tx_counts[-1]

@@ -9,7 +9,6 @@ import base64
 import logging
 from typing import Optional, Iterable, Tuple, DefaultDict, Set, Dict, List, TYPE_CHECKING
 from functools import partial
-from asyncio import sleep
 from bisect import bisect_right
 from collections import defaultdict
 from concurrent.futures.thread import ThreadPoolExecutor

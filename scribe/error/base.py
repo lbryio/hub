@@ -7,3 +7,7 @@ def claim_id(claim_hash):
 
 class BaseError(Exception):
     pass
+
+
+class ChainError(Exception):
+    """Raised on error processing blocks."""

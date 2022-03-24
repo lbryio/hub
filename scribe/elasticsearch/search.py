@@ -1,5 +1,4 @@
 import logging
-import time
 import asyncio
 import struct
 from bisect import bisect_right
@@ -9,15 +8,13 @@ from operator import itemgetter
 from typing import Optional, List, Iterable, TYPE_CHECKING
 
 from elasticsearch import AsyncElasticsearch, NotFoundError, ConnectionError
-from elasticsearch.helpers import async_streaming_bulk
 from scribe.schema.result import Censor, Outputs
 from scribe.schema.tags import clean_tags
 from scribe.schema.url import normalize_name
 from scribe.error import TooManyClaimSearchParametersError
 from scribe.common import LRUCache
 from scribe.db.common import CLAIM_TYPES, STREAM_TYPES
-from scribe.elasticsearch.constants import INDEX_DEFAULT_SETTINGS, REPLACEMENTS, FIELDS, TEXT_FIELDS, \
-    RANGE_FIELDS, ALL_FIELDS
+from scribe.elasticsearch.constants import INDEX_DEFAULT_SETTINGS, REPLACEMENTS, FIELDS, TEXT_FIELDS,  RANGE_FIELDS
 from scribe.db.common import ResolveResult
 if TYPE_CHECKING:
     from scribe.db import HubDB
