@@ -409,115 +409,115 @@ class SessionManager:
         self.notified_height = height
 
     # --- LocalRPC command handlers
-
-    async def rpc_add_peer(self, real_name):
-        """Add a peer.
-
-        real_name: "bch.electrumx.cash t50001 s50002" for example
-        """
-        await self._notify_peer(real_name)
-        return f"peer '{real_name}' added"
-
-    async def rpc_disconnect(self, session_ids):
-        """Disconnect sessions.
-
-        session_ids: array of session IDs
-        """
-        async def close(session):
-            """Close the session's transport."""
-            await session.close(force_after=2)
-            return f'disconnected {session.session_id}'
-
-        return await self._for_each_session(session_ids, close)
-
-    async def rpc_log(self, session_ids):
-        """Toggle logging of sessions.
-
-        session_ids: array of session IDs
-        """
-        async def toggle_logging(session):
-            """Toggle logging of the session."""
-            session.toggle_logging()
-            return f'log {session.session_id}: {session.log_me}'
-
-        return await self._for_each_session(session_ids, toggle_logging)
-
-    async def rpc_daemon_url(self, daemon_url):
-        """Replace the daemon URL."""
-        daemon_url = daemon_url or self.env.daemon_url
-        try:
-            self.daemon.set_url(daemon_url)
-        except Exception as e:
-            raise RPCError(BAD_REQUEST, f'an error occurred: {e!r}')
-        return f'now using daemon at {self.daemon.logged_url()}'
-
-    async def rpc_stop(self):
-        """Shut down the server cleanly."""
-        self.shutdown_event.set()
-        return 'stopping'
-
-    async def rpc_getinfo(self):
-        """Return summary information about the server process."""
-        return self._get_info()
-
-    async def rpc_groups(self):
-        """Return statistics about the session groups."""
-        return self._group_data()
-
-    async def rpc_peers(self):
-        """Return a list of data about server peers."""
-        return self.env.peer_hubs
-
-    async def rpc_query(self, items, limit):
-        """Return a list of data about server peers."""
-        coin = self.env.coin
-        db = self.db
-        lines = []
-
-        def arg_to_hashX(arg):
-            try:
-                script = bytes.fromhex(arg)
-                lines.append(f'Script: {arg}')
-                return coin.hashX_from_script(script)
-            except ValueError:
-                pass
-
-            try:
-                hashX = coin.address_to_hashX(arg)
-            except Base58Error as e:
-                lines.append(e.args[0])
-                return None
-            lines.append(f'Address: {arg}')
-            return hashX
-
-        for arg in items:
-            hashX = arg_to_hashX(arg)
-            if not hashX:
-                continue
-            n = None
-            history = await db.limited_history(hashX, limit=limit)
-            for n, (tx_hash, height) in enumerate(history):
-                lines.append(f'History #{n:,d}: height {height:,d} '
-                             f'tx_hash {hash_to_hex_str(tx_hash)}')
-            if n is None:
-                lines.append('No history found')
-            n = None
-            utxos = await db.all_utxos(hashX)
-            for n, utxo in enumerate(utxos, start=1):
-                lines.append(f'UTXO #{n:,d}: tx_hash '
-                             f'{hash_to_hex_str(utxo.tx_hash)} '
-                             f'tx_pos {utxo.tx_pos:,d} height '
-                             f'{utxo.height:,d} value {utxo.value:,d}')
-                if n == limit:
-                    break
-            if n is None:
-                lines.append('No UTXOs found')
-
-            balance = sum(utxo.value for utxo in utxos)
-            lines.append(f'Balance: {coin.decimal_value(balance):,f} '
-                         f'{coin.SHORTNAME}')
-
-        return lines
+    #
+    # async def rpc_add_peer(self, real_name):
+    #     """Add a peer.
+    #
+    #     real_name: "bch.electrumx.cash t50001 s50002" for example
+    #     """
+    #     await self._notify_peer(real_name)
+    #     return f"peer '{real_name}' added"
+    #
+    # async def rpc_disconnect(self, session_ids):
+    #     """Disconnect sessions.
+    #
+    #     session_ids: array of session IDs
+    #     """
+    #     async def close(session):
+    #         """Close the session's transport."""
+    #         await session.close(force_after=2)
+    #         return f'disconnected {session.session_id}'
+    #
+    #     return await self._for_each_session(session_ids, close)
+    #
+    # async def rpc_log(self, session_ids):
+    #     """Toggle logging of sessions.
+    #
+    #     session_ids: array of session IDs
+    #     """
+    #     async def toggle_logging(session):
+    #         """Toggle logging of the session."""
+    #         session.toggle_logging()
+    #         return f'log {session.session_id}: {session.log_me}'
+    #
+    #     return await self._for_each_session(session_ids, toggle_logging)
+    #
+    # async def rpc_daemon_url(self, daemon_url):
+    #     """Replace the daemon URL."""
+    #     daemon_url = daemon_url or self.env.daemon_url
+    #     try:
+    #         self.daemon.set_url(daemon_url)
+    #     except Exception as e:
+    #         raise RPCError(BAD_REQUEST, f'an error occurred: {e!r}')
+    #     return f'now using daemon at {self.daemon.logged_url()}'
+    #
+    # async def rpc_stop(self):
+    #     """Shut down the server cleanly."""
+    #     self.shutdown_event.set()
+    #     return 'stopping'
+    #
+    # async def rpc_getinfo(self):
+    #     """Return summary information about the server process."""
+    #     return self._get_info()
+    #
+    # async def rpc_groups(self):
+    #     """Return statistics about the session groups."""
+    #     return self._group_data()
+    #
+    # async def rpc_peers(self):
+    #     """Return a list of data about server peers."""
+    #     return self.env.peer_hubs
+    #
+    # async def rpc_query(self, items, limit):
+    #     """Return a list of data about server peers."""
+    #     coin = self.env.coin
+    #     db = self.db
+    #     lines = []
+    #
+    #     def arg_to_hashX(arg):
+    #         try:
+    #             script = bytes.fromhex(arg)
+    #             lines.append(f'Script: {arg}')
+    #             return coin.hashX_from_script(script)
+    #         except ValueError:
+    #             pass
+    #
+    #         try:
+    #             hashX = coin.address_to_hashX(arg)
+    #         except Base58Error as e:
+    #             lines.append(e.args[0])
+    #             return None
+    #         lines.append(f'Address: {arg}')
+    #         return hashX
+    #
+    #     for arg in items:
+    #         hashX = arg_to_hashX(arg)
+    #         if not hashX:
+    #             continue
+    #         n = None
+    #         history = await db.limited_history(hashX, limit=limit)
+    #         for n, (tx_hash, height) in enumerate(history):
+    #             lines.append(f'History #{n:,d}: height {height:,d} '
+    #                          f'tx_hash {hash_to_hex_str(tx_hash)}')
+    #         if n is None:
+    #             lines.append('No history found')
+    #         n = None
+    #         utxos = await db.all_utxos(hashX)
+    #         for n, utxo in enumerate(utxos, start=1):
+    #             lines.append(f'UTXO #{n:,d}: tx_hash '
+    #                          f'{hash_to_hex_str(utxo.tx_hash)} '
+    #                          f'tx_pos {utxo.tx_pos:,d} height '
+    #                          f'{utxo.height:,d} value {utxo.value:,d}')
+    #             if n == limit:
+    #                 break
+    #         if n is None:
+    #             lines.append('No UTXOs found')
+    #
+    #         balance = sum(utxo.value for utxo in utxos)
+    #         lines.append(f'Balance: {coin.decimal_value(balance):,f} '
+    #                      f'{coin.SHORTNAME}')
+    #
+    #     return lines
 
     # async def rpc_reorg(self, count):
     #     """Force a reorg of the given number of blocks.
@@ -803,11 +803,6 @@ class LBRYElectrumX(asyncio.Protocol):
             return f'[{ip_addr_str}]:{port}'
         else:
             return f'{ip_addr_str}:{port}'
-
-    def receive_message(self, message):
-        if self.log_me:
-            self.logger.info(f'processing {message}')
-        return self._receive_message_orig(message)
 
     def toggle_logging(self):
         self.log_me = not self.log_me
@@ -1538,14 +1533,14 @@ class LBRYElectrumX(asyncio.Protocol):
         height = non_negative_integer(height)
         return await self.session_manager.electrum_header(height)
 
-    def is_tor(self):
-        """Try to detect if the connection is to a tor hidden service we are
-        running."""
-        peername = self.peer_mgr.proxy_peername()
-        if not peername:
-            return False
-        peer_address = self.peer_address()
-        return peer_address and peer_address[0] == peername[0]
+    # def is_tor(self):
+    #     """Try to detect if the connection is to a tor hidden service we are
+    #     running."""
+    #     peername = self.peer_mgr.proxy_peername()
+    #     if not peername:
+    #         return False
+    #     peer_address = self.peer_address()
+    #     return peer_address and peer_address[0] == peername[0]
 
     async def replaced_banner(self, banner):
         network_info = await self.daemon_request('getnetworkinfo')
@@ -1727,9 +1722,9 @@ class LBRYElectrumX(asyncio.Protocol):
         tx_hashes: ordered list of hex strings of tx hashes in a block
         tx_pos: index of transaction in tx_hashes to create branch for
         """
-        hashes = [hex_str_to_hash(hash) for hash in tx_hashes]
+        hashes = [hex_str_to_hash(_hash) for _hash in tx_hashes]
         branch, root = self.db.merkle.branch_and_root(hashes, tx_pos)
-        branch = [hash_to_hex_str(hash) for hash in branch]
+        branch = [hash_to_hex_str(_hash) for _hash in branch]
         return branch
 
     async def transaction_merkle(self, tx_hash, height):
@@ -1745,7 +1740,6 @@ class LBRYElectrumX(asyncio.Protocol):
             raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
                                         f'block at height {height:,d}')
         return result[tx_hash][1]
-
 
 
 def get_from_possible_keys(dictionary, *keys):

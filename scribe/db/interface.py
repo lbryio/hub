@@ -56,13 +56,13 @@ class PrefixRow(metaclass=PrefixRowType):
                 stop = self.pack_partial_key(*stop)
 
         if deserialize_key:
-            key_getter = lambda k: self.unpack_key(k)
+            key_getter = lambda _k: self.unpack_key(_k)
         else:
-            key_getter = lambda k: k
+            key_getter = lambda _k: _k
         if deserialize_value:
-            value_getter = lambda v: self.unpack_value(v)
+            value_getter = lambda _v: self.unpack_value(_v)
         else:
-            value_getter = lambda v: v
+            value_getter = lambda _v: _v
 
         it = self._db.iterator(
             start or prefix, self._column_family, iterate_lower_bound=(start or prefix),

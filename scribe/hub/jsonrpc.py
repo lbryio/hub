@@ -437,6 +437,12 @@ class JSONRPCAutoDetect(JSONRPCv2):
         return protocol_for_payload(main)
 
 
+class ResultEvent(asyncio.Event):
+    def __init__(self, loop=None):
+        super().__init__(loop=loop)
+        self.result = None
+
+
 class JSONRPCConnection:
     """Maintains state of a JSON RPC connection, in particular
     encapsulating the handling of request IDs.
@@ -453,7 +459,7 @@ class JSONRPCConnection:
         # Sent Requests and Batches that have not received a response.
         # The key is its request ID; for a batch it is sorted tuple
         # of request IDs
-        self._requests: typing.Dict[str, typing.Tuple[Request, Event]] = {}
+        self._requests: typing.Dict[str, typing.Tuple[Request, ResultEvent]] = {}
         # A public attribute intended to be settable dynamically
         self.max_response_size = 0
 
@@ -533,7 +539,7 @@ class JSONRPCConnection:
         return message
 
     def _event(self, request, request_id):
-        event = Event()
+        event = ResultEvent()
         self._requests[request_id] = (request, event)
         return event
 

@@ -104,7 +104,7 @@ class LBCDaemon:
         async with self.workqueue_semaphore:
             async with self.client_session() as session:
                 async with session.post(self.current_url(), data=data) as resp:
-                    kind = resp.headers.get('Content-Type', None)
+                    kind = resp.headers.get('Content-Type')
                     if kind == 'application/json':
                         return await resp.json()
                     # bitcoind's HTTP protocol "handling" is a bad joke
@@ -319,10 +319,10 @@ class LBCDaemon:
 
     @handles_errors
     async def getclaimsforname(self, name):
-        '''Given a name, retrieves all claims matching that name.'''
+        """Given a name, retrieves all claims matching that name."""
         return await self._send_single('getclaimsforname', (name,))
 
     @handles_errors
     async def getbestblockhash(self):
-        '''Given a name, retrieves all claims matching that name.'''
+        """Given a name, retrieves all claims matching that name."""
         return await self._send_single('getbestblockhash')

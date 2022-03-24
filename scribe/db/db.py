@@ -988,14 +988,14 @@ class HubDB:
                 merkle = {
                     'block_height': tx_height,
                     'merkle': [
-                        hash_to_hex_str(hash)
-                        for hash in branch
+                        hash_to_hex_str(_hash)
+                        for _hash in branch
                     ],
                     'pos': tx_pos
                 }
             if tx_height + 10 < self.db_height:
                 self._tx_and_merkle_cache[tx_hash] = tx, merkle
-        return (None if not tx else tx.hex(), merkle)
+        return None if not tx else tx.hex(), merkle
 
     async def fs_block_hashes(self, height, count):
         if height + count > len(self.headers):

@@ -142,7 +142,7 @@ class MemPool:
             if tx_hash not in self.txs:
                 continue  # the tx hash for the touched address is an input that isn't in mempool anymore
             tx = self.txs[tx_hash]
-            has_ui = any(hash in self.txs for hash, idx in tx.in_pairs)
+            has_ui = any(_hash in self.txs for _hash, idx in tx.in_pairs)
             result.append(MemPoolTxSummary(tx_hash, tx.fee, has_ui))
         return result
 
@@ -193,7 +193,7 @@ class MemPool:
         if tx_hash not in self.txs:
             return -2
         tx = self.txs[tx_hash]
-        unspent_inputs = any(hash in self.raw_mempool for hash, idx in tx.in_pairs)
+        unspent_inputs = any(_hash in self.raw_mempool for _hash, idx in tx.in_pairs)
         if unspent_inputs:
             return -1
         return 0

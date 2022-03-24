@@ -22,16 +22,6 @@ HISTOGRAM_BUCKETS = (
     .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
 )
 
-# class cachedproperty:
-#     def __init__(self, f):
-#         self.f = f
-#
-#     def __get__(self, obj, type):
-#         obj = obj or type
-#         value = self.f(obj)
-#         setattr(obj, self.f.__name__, value)
-#         return value
-
 
 class StagedClaimtrieItem(typing.NamedTuple):
     """
