@@ -357,6 +357,8 @@ class ElasticSyncService(BlockchainReaderService):
         yield self.start_cancellable(self.run_es_notifier)
         yield self.reindex(force=self._force_reindex)
         yield self.catch_up()
+        self.block_count_metric.set(self.last_state.height)
+        yield self.start_prometheus()
         yield self.start_cancellable(self.refresh_blocks_forever)
 
     def _iter_stop_tasks(self):

@@ -92,6 +92,7 @@ class HubServerService(BlockchainReaderService):
         yield self.start_cancellable(self.es_notification_client.maintain_connection)
         yield self.start_cancellable(self.refresh_blocks_forever)
         yield self.finished_initial_catch_up.wait()
+        self.block_count_metric.set(self.last_state.height)
         yield self.start_prometheus()
         yield self.start_cancellable(self.receive_es_notifications)
         yield self.session_manager.search_index.start()
