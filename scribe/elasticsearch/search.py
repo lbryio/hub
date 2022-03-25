@@ -352,13 +352,37 @@ def expand_query(**kwargs):
                 query['must'].append({"range": {key: {ops[operator]: value}}})
             elif key in RANGE_FIELDS and isinstance(value, list) and all(v[0] in ops for v in value):
                 range_constraints = []
+                release_times = []
                 for v in value:
                     operator_length = 2 if v[:2] in ops else 1
                     operator, stripped_op_v = v[:operator_length], v[operator_length:]
                     if key == 'fee_amount':
                         stripped_op_v = str(Decimal(stripped_op_v)*1000)
-                    range_constraints.append((operator, stripped_op_v))
-                query['must'].append({"range": {key: {ops[operator]: v for operator, v in range_constraints}}})
+                    if key == 'release_time':
+                        release_times.append((operator, stripped_op_v))
+                    else:
+                        range_constraints.append((operator, stripped_op_v))
+                if key != 'release_time':
+                    query['must'].append({"range": {key: {ops[operator]: v for operator, v in range_constraints}}})
+                else:
+                    query['must'].append(
+                        {"bool":
+                            {"should": [
+                                {"bool": {
+                                    "must_not": {
+                                        "exists": {
+                                            "field": "release_time"
+                                        }
+                                    }
+                                }},
+                                {"bool": {
+                                    "must": [
+                                        {"exists": {"field": "release_time"}},
+                                        {'range': {key: {ops[operator]: v for operator, v in release_times}}},
+                                ]}},
+                            ]}
+                        }
+                    )
             elif many:
                 query['must'].append({"terms": {key: value}})
             else:
