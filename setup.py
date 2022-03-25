@@ -29,7 +29,7 @@ setup(
         ],
     },
     install_requires=[
-        'aiohttp==3.6.2',
+        'aiohttp==3.7.4',
         'certifi>=2021.10.08',
         'colorama==0.3.7',
         'protobuf==3.17.2',
