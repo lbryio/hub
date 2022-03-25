@@ -352,13 +352,37 @@ def expand_query(**kwargs):
                 query['must'].append({"range": {key: {ops[operator]: value}}})
             elif key in RANGE_FIELDS and isinstance(value, list) and all(v[0] in ops for v in value):
                 range_constraints = []
+                release_times = []
                 for v in value:
                     operator_length = 2 if v[:2] in ops else 1
                     operator, stripped_op_v = v[:operator_length], v[operator_length:]
                     if key == 'fee_amount':
                         stripped_op_v = str(Decimal(stripped_op_v)*1000)
-                    range_constraints.append((operator, stripped_op_v))
-                query['must'].append({"range": {key: {ops[operator]: v for operator, v in range_constraints}}})
+                    if key == 'release_time':
+                        release_times.append((operator, stripped_op_v))
+                    else:
+                        range_constraints.append((operator, stripped_op_v))
+                if key != 'release_time':
+                    query['must'].append({"range": {key: {ops[operator]: v for operator, v in range_constraints}}})
+                else:
+                    query['must'].append(
+                        {"bool":
+                            {"should": [
+                                {"bool": {
+                                    "must_not": {
+                                        "exists": {
+                                            "field": "release_time"
+                                        }
+                                    }
+                                }},
+                                {"bool": {
+                                    "must": [
+                                        {"exists": {"field": "release_time"}},
+                                        {'range': {key: {ops[operator]: v for operator, v in release_times}}},
+                                ]}},
+                            ]}
+                        }
+                    )
             elif many:
                 query['must'].append({"terms": {key: value}})
             else:
@@ -396,18 +420,43 @@ def expand_query(**kwargs):
         if 'signature_valid' in kwargs:
             query['must'].append({"term": {"is_signature_valid": bool(kwargs["signature_valid"])}})
     elif 'signature_valid' in kwargs:
-        query.setdefault('should', [])
-        query["minimum_should_match"] = 1
-        query['should'].append({"bool": {"must_not": {"exists": {"field": "signature"}}}})
-        query['should'].append({"term": {"is_signature_valid": bool(kwargs["signature_valid"])}})
+        query['must'].append(
+            {"bool":
+                {"should": [
+                    {"bool": {"must_not": {"exists": {"field": "signature"}}}},
+                    {"bool" : {"must" : {"term": {"is_signature_valid": bool(kwargs["signature_valid"])}}}}
+                ]}
+             }
+        )
     if 'has_source' in kwargs:
-        query.setdefault('should', [])
-        query["minimum_should_match"] = 1
-        is_stream_or_repost = {"terms": {"claim_type": [CLAIM_TYPES['stream'], CLAIM_TYPES['repost']]}}
-        query['should'].append(
-            {"bool": {"must": [{"match": {"has_source": kwargs['has_source']}}, is_stream_or_repost]}})
-        query['should'].append({"bool": {"must_not": [is_stream_or_repost]}})
-        query['should'].append({"bool": {"must": [{"term": {"reposted_claim_type": CLAIM_TYPES['channel']}}]}})
+        is_stream_or_repost_terms = {"terms": {"claim_type": [CLAIM_TYPES['stream'], CLAIM_TYPES['repost']]}}
+        query['must'].append(
+            {"bool":
+                {"should": [
+                    {"bool": # when is_stream_or_repost AND has_source
+                        {"must": [
+                            {"match": {"has_source": kwargs['has_source']}},
+                            is_stream_or_repost_terms,
+                        ]
+                        },
+                     },
+                    {"bool": # when not is_stream_or_repost
+                        {"must_not": is_stream_or_repost_terms}
+                     },
+                    {"bool": # when reposted_claim_type wouldn't have source
+                        {"must_not":
+                            [
+                                {"term": {"reposted_claim_type": CLAIM_TYPES['stream']}}
+                            ],
+                        "must":
+                            [
+                                {"term": {"claim_type": CLAIM_TYPES['repost']}}
+                            ]
+                        }
+                     }
+                ]}
+             }
+        )
     if kwargs.get('text'):
         query['must'].append(
                     {"simple_query_string":
