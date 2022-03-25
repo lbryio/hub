@@ -155,6 +155,9 @@ class MemPool:
         utxos = []
         for tx_hash in self.touched_hashXs.get(hashX, ()):
             tx = self.txs.get(tx_hash)
+            if not tx:
+                self.logger.error("%s isn't in mempool", tx_hash[::-1].hex())
+                continue
             for pos, (hX, value) in enumerate(tx.out_pairs):
                 if hX == hashX:
                     utxos.append(UTXO(-1, pos, tx_hash, 0, value))
