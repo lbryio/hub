@@ -32,6 +32,7 @@ setup(
         'aiohttp==3.7.4',
         'certifi>=2021.10.08',
         'colorama==0.3.7',
+        'cffi==1.13.2',
         'protobuf==3.17.2',
         'msgpack==0.6.1',
         'prometheus_client==0.7.1',
