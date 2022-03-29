@@ -23,9 +23,9 @@ setup(
     zip_safe=False,
     entry_points={
         'console_scripts': [
-            'scribe=scribe.cli:run_writer_forever',
-            'scribe-hub=scribe.cli:run_server_forever',
-            'scribe-elastic-sync=scribe.cli:run_es_sync_forever',
+            'scribe=scribe.blockchain.__main__:main',
+            'scribe-hub=scribe.hub.__main__:main',
+            'scribe-elastic-sync=scribe.elasticsearch.__main__:main',
         ],
     },
     install_requires=[

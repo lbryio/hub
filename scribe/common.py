@@ -23,6 +23,12 @@ HISTOGRAM_BUCKETS = (
 )
 
 
+def setup_logging():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-4s %(name)s:%(lineno)d: %(message)s")
+    logging.getLogger('aiohttp').setLevel(logging.WARNING)
+    logging.getLogger('elasticsearch').setLevel(logging.WARNING)
+
+
 class StagedClaimtrieItem(typing.NamedTuple):
     """
     Represents a claim TXO, used internally by the block processor

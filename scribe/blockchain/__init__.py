@@ -1,1 +1,1 @@
-from .network import LBCTestNet, LBCRegTest, LBCMainNet
+from scribe.blockchain.network import LBCTestNet, LBCRegTest, LBCMainNet
