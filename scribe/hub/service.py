@@ -1,3 +1,5 @@
+import time
+
 import asyncio
 from scribe.blockchain.daemon import LBCDaemon
 from scribe.hub.session import SessionManager
@@ -45,7 +47,9 @@ class HubServerService(BlockchainReaderService):
 
     def _detect_changes(self):
         super()._detect_changes()
+        start = time.perf_counter()
         self.mempool_notifications.update(self.mempool.refresh())
+        self.mempool.mempool_process_time_metric.observe(time.perf_counter() - start)
 
     async def poll_for_changes(self):
         await super().poll_for_changes()
