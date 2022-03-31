@@ -14,7 +14,7 @@ RUN apt-get update && \
     apt-get -y --no-install-recommends install \
       wget \
       tar unzip \
-      build-essential \
+      build-essential libssl-dev libffi-dev \
       automake libtool \
       pkg-config \
       python3.9 \
