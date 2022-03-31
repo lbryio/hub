@@ -1,60 +1,60 @@
-name: "Build"
-
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ master ]
-  schedule:
-    - cron: '43 2 * * 0'
-
-jobs:
-  build:
-    name: "build / binary"
-    strategy:
-      matrix:
-        os:
-          - ubuntu-20.04
-          - macos-latest
-#          - windows-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
-        with:
-          python-version: '3.9'
-      - id: os-name
-        uses: ASzc/change-string-case-action@v1
-        with:
-          string: ${{ runner.os }}
-      - name: set pip cache dir
-        id: pip-cache
-        run: echo "::set-output name=dir::$(pip cache dir)"
-      - name: extract pip cache
-        uses: actions/cache@v2
-        with:
-          path: ${{ steps.pip-cache.outputs.dir }}
-          key: ${{ runner.os }}-pip-${{ hashFiles('setup.py') }}
-          restore-keys: ${{ runner.os }}-pip-
-      - run: pip install pyinstaller==4.4
-      - run: pip install -e .
-      - if: startsWith(github.ref, 'refs/tags/v')
-        run: python docker/set_build.py
-      - if: startsWith(runner.os, 'linux') || startsWith(runner.os, 'mac')
-        name: Build & Run (Unix)
-        run: |
-          pyinstaller --onefile --name scribe scribe/blockchain/__main__.py
-          pyinstaller --onefile --name scribe-elastic-sync scribe/elasticsearch/__main__.py
-          pyinstaller --onefile --name scribe-hub scribe/hub/__main__.py
-          dist/scribe --version
-#      - if: startsWith(runner.os, 'windows')
-#        name: Build & Run (Windows)
+#name: "Build"
+#
+#on:
+#  push:
+#    branches: [ master ]
+#  pull_request:
+#    # The branches below must be a subset of the branches above
+#    branches: [ master ]
+#  schedule:
+#    - cron: '43 2 * * 0'
+#
+#jobs:
+#  build:
+#    name: "build / binary"
+#    strategy:
+#      matrix:
+#        os:
+#          - ubuntu-20.04
+#          - macos-latest
+##          - windows-latest
+#    runs-on: ${{ matrix.os }}
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions/setup-python@v1
+#        with:
+#          python-version: '3.9'
+#      - id: os-name
+#        uses: ASzc/change-string-case-action@v1
+#        with:
+#          string: ${{ runner.os }}
+#      - name: set pip cache dir
+#        id: pip-cache
+#        run: echo "::set-output name=dir::$(pip cache dir)"
+#      - name: extract pip cache
+#        uses: actions/cache@v2
+#        with:
+#          path: ${{ steps.pip-cache.outputs.dir }}
+#          key: ${{ runner.os }}-pip-${{ hashFiles('setup.py') }}
+#          restore-keys: ${{ runner.os }}-pip-
+#      - run: pip install pyinstaller==4.4
+#      - run: pip install -e .
+#      - if: startsWith(github.ref, 'refs/tags/v')
+#        run: python docker/set_build.py
+#      - if: startsWith(runner.os, 'linux') || startsWith(runner.os, 'mac')
+#        name: Build & Run (Unix)
 #        run: |
-#          pip install pywin32==301
-#          pyinstaller --additional-hooks-dir=scripts/. --icon=icons/lbry256.ico --onefile --name lbrynet lbry/extras/cli.py
-#          dist/lbrynet.exe --version
-      - uses: actions/upload-artifact@v2
-        with:
-          name: scribe-${{ steps.os-name.outputs.lowercase }}
-          path: dist/
+#          pyinstaller --onefile --name scribe scribe/blockchain/__main__.py
+#          pyinstaller --onefile --name scribe-elastic-sync scribe/elasticsearch/__main__.py
+#          pyinstaller --onefile --name scribe-hub scribe/hub/__main__.py
+#          dist/scribe --version
+##      - if: startsWith(runner.os, 'windows')
+##        name: Build & Run (Windows)
+##        run: |
+##          pip install pywin32==301
+##          pyinstaller --additional-hooks-dir=scripts/. --icon=icons/lbry256.ico --onefile --name lbrynet lbry/extras/cli.py
+##          dist/lbrynet.exe --version
+#      - uses: actions/upload-artifact@v2
+#        with:
+#          name: scribe-${{ steps.os-name.outputs.lowercase }}
+#          path: dist/
