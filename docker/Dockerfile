@@ -19,6 +19,7 @@ RUN apt-get update && \
       pkg-config \
       python3.9 \
       python3.9-dev \
+      python3-cffi \
       python3-pip  && \
     update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1 && \
     rm -rf /var/lib/apt/lists/*
