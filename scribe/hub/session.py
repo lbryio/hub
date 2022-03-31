@@ -16,9 +16,9 @@ from functools import partial
 from elasticsearch import ConnectionTimeout
 from prometheus_client import Counter, Info, Histogram, Gauge
 from scribe.schema.result import Outputs
-from scribe.schema.base58 import Base58Error
 from scribe.error import ResolveCensoredError, TooManyClaimSearchParametersError
-from scribe import __version__, PROTOCOL_MIN, PROTOCOL_MAX, PROMETHEUS_NAMESPACE
+from scribe import __version__, PROMETHEUS_NAMESPACE
+from scribe.hub import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
 from scribe.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from scribe.elasticsearch import SearchIndex
 from scribe.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
@@ -129,7 +129,7 @@ class SessionManager:
         "cpu_count": str(os.cpu_count())
     })
     session_count_metric = Gauge("session_count", "Number of connected client sessions", namespace=NAMESPACE,
-                                      labelnames=("version",))
+                                 labelnames=("version",))
     request_count_metric = Counter("requests_count", "Number of requests received", namespace=NAMESPACE,
                                    labelnames=("method", "version"))
     tx_request_count_metric = Counter("requested_transaction", "Number of transactions requested", namespace=NAMESPACE)
@@ -647,7 +647,7 @@ class LBRYElectrumX(asyncio.Protocol):
     PROTOCOL_MIN = PROTOCOL_MIN
     PROTOCOL_MAX = PROTOCOL_MAX
     max_errors = math.inf  # don't disconnect people for errors! let them happen...
-    version = __version__
+    version = HUB_PROTOCOL_VERSION
     cached_server_features = {}
 
     MAX_CHUNK_SIZE = 40960
