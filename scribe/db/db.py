@@ -1002,17 +1002,14 @@ class HubDB:
             raise DBError(f'only got {len(self.headers) - height:,d} headers starting at {height:,d}, not {count:,d}')
         return [self.coin.header_hash(header) for header in self.headers[height:height + count]]
 
-    def read_history(self, hashX: bytes, limit: int = 1000) -> List[Tuple[bytes, int]]:
+    def read_history(self, hashX: bytes, limit: int = 1000) -> List[int]:
         txs = []
         txs_extend = txs.extend
         for hist in self.prefix_db.hashX_history.iterate(prefix=(hashX,), include_key=False):
             txs_extend(hist)
             if len(txs) >= limit:
                 break
-        return [
-            (self.get_tx_hash(tx_num), bisect_right(self.tx_counts, tx_num))
-            for tx_num in txs
-        ]
+        return txs
 
     async def limited_history(self, hashX, *, limit=1000):
         """Return an unpruned, sorted list of (tx_hash, height) tuples of
@@ -1021,7 +1018,16 @@ class HubDB:
         transactions.  By default returns at most 1000 entries.  Set
         limit to None to get them all.
         """
-        return await asyncio.get_event_loop().run_in_executor(self._executor, self.read_history, hashX, limit)
+        run_in_executor = asyncio.get_event_loop().run_in_executor
+        tx_nums = await run_in_executor(self._executor, self.read_history, hashX, limit)
+        history = []
+        append_history = history.append
+        for tx_num in tx_nums:
+            tx_hash = self.get_tx_hash(tx_num) \
+                if self._cache_all_tx_hashes else await run_in_executor(self._executor, self.get_tx_hash, tx_num)
+            append_history((tx_hash, bisect_right(self.tx_counts, tx_num)))
+            await asyncio.sleep(0)
+        return history
 
     # -- Undo information
 
