@@ -26,7 +26,7 @@ class PrefixRow(metaclass=PrefixRowType):
     key_struct: struct.Struct
     value_struct: struct.Struct
     key_part_lambdas = []
-    cache_size: int = 1024 * 1024 * 64
+    cache_size: int = 1024 * 1024 * 16
 
     def __init__(self, db: 'rocksdb.DB', op_stack: RevertableOpStack):
         self._db = db

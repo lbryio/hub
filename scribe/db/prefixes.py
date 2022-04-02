@@ -440,7 +440,7 @@ class ActiveAmountPrefixRow(PrefixRow):
         struct.Struct(b'>20sBLL').pack,
         struct.Struct(b'>20sBLLH').pack
     ]
-    cache_size = 1024 * 1024 * 128
+    cache_size = 1024 * 1024 * 64
 
     @classmethod
     def pack_key(cls, claim_hash: bytes, txo_type: int, activation_height: int, tx_num: int, position: int):
@@ -471,7 +471,7 @@ class ClaimToTXOPrefixRow(PrefixRow):
         lambda: b'',
         struct.Struct(b'>20s').pack
     ]
-    cache_size = 1024 * 1024 * 128
+    cache_size = 1024 * 1024 * 64
 
     @classmethod
     def pack_key(cls, claim_hash: bytes):
@@ -511,7 +511,7 @@ class TXOToClaimPrefixRow(PrefixRow):
     prefix = DB_PREFIXES.txo_to_claim.value
     key_struct = struct.Struct(b'>LH')
     value_struct = struct.Struct(b'>20s')
-    cache_size = 1024 * 1024 * 128
+    cache_size = 1024 * 1024 * 64
 
     @classmethod
     def pack_key(cls, tx_num: int, position: int):
@@ -906,7 +906,7 @@ class EffectiveAmountPrefixRow(PrefixRow):
         shortid_key_helper(b'>QL'),
         shortid_key_helper(b'>QLH'),
     ]
-    cache_size = 1024 * 1024 * 128
+    cache_size = 1024 * 1024 * 64
 
     @classmethod
     def pack_key(cls, name: str, effective_amount: int, tx_num: int, position: int):
