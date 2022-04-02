@@ -221,13 +221,18 @@ class MemPool:
             return
 
         if height_changed:
-            header_tasks = [
-                session.send_notification('blockchain.headers.subscribe', (self.session_manager.hsub_results[session.subscribe_headers_raw], ))
-                for session in self.session_manager.sessions.values() if session.subscribe_headers
-            ]
-            if header_tasks:
-                self.logger.info(f'notify {len(header_tasks)} sessions of new header')
-                asyncio.create_task(asyncio.wait(header_tasks))
+            notified = 0
+            for session in self.session_manager.sessions.values():
+                if session.subscribe_headers:
+                    notified += 1
+                    asyncio.create_task(
+                        session.send_notification('blockchain.headers.subscribe',
+                                                  (self.session_manager.hsub_results[session.subscribe_headers_raw], ))
+                    )
+                    if notified % 10 == 0:
+                        await asyncio.sleep(0)  # break up the loop somewhat, there can be many headers notifications
+            if notified:
+                self.logger.info(f'queued notify {notified} sessions of new header')
             for hashX in touched.intersection(self.session_manager.mempool_statuses.keys()):
                 self.session_manager.mempool_statuses.pop(hashX, None)
         # self.bp._chain_executor
