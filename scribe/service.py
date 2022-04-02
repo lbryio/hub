@@ -85,10 +85,8 @@ class BlockchainService:
     async def _run(self):
         try:
             await self.start()
-            self.log.info("finished start(), waiting for shutdown event")
             await self.shutdown_event.wait()
         except (SystemExit, KeyboardInterrupt, asyncio.CancelledError):
-            self.log.warning("exiting")
             self._stopping = True
         except Exception as err:
             self.log.exception("unexpected fatal error: %s", err)
