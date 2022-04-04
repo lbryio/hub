@@ -223,6 +223,7 @@ class BlockchainReaderService(BlockchainService):
                 raise
             except:
                 self.log.exception("blockchain reader main loop encountered an unexpected error")
+                self.shutdown_event.set()
                 raise
             await asyncio.sleep(self._refresh_interval)
             synchronized.set()
