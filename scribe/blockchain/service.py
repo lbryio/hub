@@ -1327,6 +1327,21 @@ class BlockchainProcessorService(BlockchainService):
         self.db.prefix_db.tx_count.stage_put(key_args=(height,), value_args=(tx_count,))
 
         for hashX, new_history in self.hashXs_by_tx.items():
+            if height > self.env.reorg_limit:  # compactify existing history
+                hist_txs = b''
+                # accumulate and delete all of the tx histories between height 1 and current - reorg_limit
+                for k, hist in self.db.prefix_db.hashX_history.iterate(
+                        start=(hashX, 1), stop=(hashX, height - self.env.reorg_limit),
+                        deserialize_key=False, deserialize_value=False):
+                    hist_txs += hist
+                    self.db.prefix_db.stage_raw_delete(k, hist)
+                if hist_txs:
+                    # add the accumulated histories onto the existing compacted history at height 0
+                    key = self.db.prefix_db.hashX_history.pack_key(hashX, 0)
+                    existing = self.db.prefix_db.get(key)
+                    if existing is not None:
+                        self.db.prefix_db.stage_raw_delete(key, existing)
+                    self.db.prefix_db.stage_raw_put(key, (existing or b'') + hist_txs)
             if not new_history:
                 continue
             self.db.prefix_db.hashX_history.stage_put(key_args=(hashX, height), value_args=(new_history,))
