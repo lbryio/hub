@@ -1666,53 +1666,23 @@ class LBRYElectrumX(asyncio.Protocol):
         for tx_hash in tx_hashes:
             assert_tx_hash(tx_hash)
         batch_result = await self.db.get_transactions_and_merkles(tx_hashes)
-        needed_merkles = {}
-
-        for tx_hash in tx_hashes:
-            if tx_hash in batch_result and batch_result[tx_hash][0]:
-                continue
-            tx_hash_bytes = bytes.fromhex(tx_hash)[::-1]
-            mempool_tx = self.mempool.txs.get(tx_hash_bytes, None)
-            if mempool_tx:
-                raw_tx, block_hash = mempool_tx.raw_tx.hex(), None
-            else:
-                tx_info = await self.daemon_request('getrawtransaction', tx_hash, 1)
-                raw_tx = tx_info['hex']
-                block_hash = tx_info.get('blockhash')
-            if block_hash:
-                block = await self.daemon.deserialised_block(block_hash)
-                height = block['height']
-                try:
-                    pos = block['tx'].index(tx_hash)
-                except ValueError:
-                    raise RPCError(BAD_REQUEST, f'tx hash {tx_hash} not in '
-                                                f'block {block_hash} at height {height:,d}')
-                needed_merkles[tx_hash] = raw_tx, block['tx'], pos, height
-            else:
-                batch_result[tx_hash] = [raw_tx, {'block_height': -1}]
-
-        if needed_merkles:
-            for tx_hash, (raw_tx, block_txs, pos, block_height) in needed_merkles.items():
-                batch_result[tx_hash] = raw_tx, {
-                    'merkle': self._get_merkle_branch(block_txs, pos),
-                    'pos': pos,
-                    'block_height': block_height
-                }
-                await asyncio.sleep(0)  # heavy call, give other tasks a chance
         self.session_manager.tx_replied_count_metric.inc(len(tx_hashes))
         return batch_result
 
-    async def transaction_get(self, tx_hash, verbose=False):
+    async def transaction_get(self, txid: str, verbose=False):
         """Return the serialized raw transaction given its hash
 
-        tx_hash: the transaction hash as a hexadecimal string
+        txid: the transaction hash as a hexadecimal string
         verbose: passed on to the daemon
         """
-        assert_tx_hash(tx_hash)
+        assert_tx_hash(txid)
         if verbose not in (True, False):
             raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
+        tx_hash_bytes = bytes.fromhex(txid)[::-1]
 
-        return await self.daemon_request('getrawtransaction', tx_hash, int(verbose))
+        raw_tx = await asyncio.get_event_loop().run_in_executor(None, self.db.get_raw_tx, tx_hash_bytes)
+        if raw_tx:
+            return raw_tx.hex()
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
         """Return a merkle branch to a transaction.

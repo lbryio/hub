@@ -853,6 +853,15 @@ class HubDB:
             return self.total_transactions[tx_num]
         return self.prefix_db.tx_hash.get(tx_num, deserialize_value=False)
 
+    def get_raw_mempool_tx(self, tx_hash: bytes) -> Optional[bytes]:
+        return self.prefix_db.mempool_tx.get(tx_hash, deserialize_value=False)
+
+    def get_raw_confirmed_tx(self, tx_hash: bytes) -> Optional[bytes]:
+        return self.prefix_db.tx.get(tx_hash, deserialize_value=False)
+
+    def get_raw_tx(self, tx_hash: bytes) -> Optional[bytes]:
+        return self.get_raw_mempool_tx(tx_hash) or self.get_raw_confirmed_tx(tx_hash)
+
     def get_tx_num(self, tx_hash: bytes) -> int:
         if self._cache_all_tx_hashes:
             return self.tx_num_mapping[tx_hash]
@@ -973,13 +982,14 @@ class HubDB:
                 if self._cache_all_claim_txos:
                     fill_cache = tx_num in self.txo_to_claim and len(self.txo_to_claim[tx_num]) > 0
                 else:
-                    fill_cache = False
+                    fill_cache = True
                 tx_height = bisect_right(self.tx_counts, tx_num)
                 tx = self.prefix_db.tx.get(tx_hash_bytes, fill_cache=fill_cache, deserialize_value=False)
             if tx_height == -1:
                 merkle = {
                     'block_height': -1
                 }
+                tx = self.prefix_db.mempool_tx.get(tx_hash_bytes, deserialize_value=False)
             else:
                 tx_pos = tx_num - self.tx_counts[tx_height - 1]
                 branch, root = self.merkle.branch_and_root(

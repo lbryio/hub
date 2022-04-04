@@ -52,6 +52,7 @@ class MemPool:
         self.refresh_secs = refresh_secs
         self.mempool_process_time_metric = mempool_process_time_metric
         self.session_manager: typing.Optional['SessionManager'] = None
+        self._notification_q = asyncio.Queue()
 
     def refresh(self) -> typing.Set[bytes]:  # returns list of new touched hashXs
         prefix_db = self._db.prefix_db
@@ -211,6 +212,20 @@ class MemPool:
     async def on_block(self, touched, height):
         await self._notify_sessions(height, touched, set())
 
+    async def send_notifications_forever(self, started):
+        started.set()
+        while True:
+            (session_id, height_changed, hashXes) = await self._notification_q.get()
+            session = self.session_manager.sessions.get(session_id)
+            if session:
+                if session.subscribe_headers and height_changed:
+                    asyncio.create_task(
+                        session.send_notification('blockchain.headers.subscribe',
+                                                  (self.session_manager.hsub_results[session.subscribe_headers_raw],))
+                    )
+                if hashXes:
+                    asyncio.create_task(session.send_history_notifications(*hashXes))
+
     async def _notify_sessions(self, height, touched, new_touched):
         """Notify sessions about height changes and touched addresses."""
         height_changed = height != self.session_manager.notified_height
@@ -221,18 +236,6 @@ class MemPool:
             return
 
         if height_changed:
-            notified = 0
-            for session in self.session_manager.sessions.values():
-                if session.subscribe_headers:
-                    notified += 1
-                    asyncio.create_task(
-                        session.send_notification('blockchain.headers.subscribe',
-                                                  (self.session_manager.hsub_results[session.subscribe_headers_raw], ))
-                    )
-                    if notified % 10 == 0:
-                        await asyncio.sleep(0)  # break up the loop somewhat, there can be many headers notifications
-            if notified:
-                self.logger.info(f'queued notify {notified} sessions of new header')
             for hashX in touched.intersection(self.session_manager.mempool_statuses.keys()):
                 self.session_manager.mempool_statuses.pop(hashX, None)
         # self.bp._chain_executor
@@ -240,9 +243,11 @@ class MemPool:
             self._db._executor, touched.intersection_update, self.session_manager.hashx_subscriptions_by_session.keys()
         )
 
+        session_hashxes_to_notify = defaultdict(list)
+        notified_hashxs = 0
+        sent_headers = 0
+
         if touched or new_touched or (height_changed and self.session_manager.mempool_statuses):
-            notified_hashxs = 0
-            session_hashxes_to_notify = defaultdict(list)
             to_notify = touched if height_changed else new_touched
 
             for hashX in to_notify:
@@ -251,7 +256,18 @@ class MemPool:
                 for session_id in self.session_manager.hashx_subscriptions_by_session[hashX]:
                     session_hashxes_to_notify[session_id].append(hashX)
                     notified_hashxs += 1
-            for session_id, hashXes in session_hashxes_to_notify.items():
-                asyncio.create_task(self.session_manager.sessions[session_id].send_history_notifications(*hashXes))
-            if session_hashxes_to_notify:
-                self.logger.info(f'notified {len(session_hashxes_to_notify)} sessions/{notified_hashxs:,d} touched addresses')
+
+        for session_id, session in self.session_manager.sessions.items():
+            hashXes = None
+            if session_id in session_hashxes_to_notify:
+                hashXes = session_hashxes_to_notify[session_id]
+            elif not session.subscribe_headers:
+                continue
+            if session.subscribe_headers and height_changed:
+                sent_headers += 1
+            self._notification_q.put_nowait((session_id, height_changed, hashXes))
+
+        if sent_headers:
+            self.logger.info(f'notified {sent_headers} sessions of new block header')
+        if session_hashxes_to_notify:
+            self.logger.info(f'notified {len(session_hashxes_to_notify)} sessions/{notified_hashxs:,d} touched addresses')
