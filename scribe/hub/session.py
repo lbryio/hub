@@ -215,8 +215,7 @@ class SessionManager:
             protocol_class = LBRYElectrumX
         else:
             raise ValueError(kind)
-        protocol_factory = partial(protocol_class, self, self.db,
-                                   self.mempool, kind)
+        protocol_factory = partial(protocol_class, self, kind)
 
         host, port = args[:2]
         try:
@@ -666,7 +665,7 @@ class LBRYElectrumX(asyncio.Protocol):
     )
     max_errors = 10
 
-    def __init__(self, session_manager: SessionManager, db: 'HubDB', mempool: 'MemPool', kind: str):
+    def __init__(self, session_manager: SessionManager, kind: str):
         connection = JSONRPCConnection(JSONRPCAutoDetect)
         self.env = session_manager.env
         self.framer = self.default_framer()
@@ -700,8 +699,7 @@ class LBRYElectrumX(asyncio.Protocol):
 
         self.logger = logging.getLogger(__name__)
         self.session_manager = session_manager
-        self.db = db
-        self.mempool = mempool
+
         self.kind = kind  # 'RPC', 'TCP' etc.
         self.coin = self.env.coin
         self.anon_logs = self.env.anon_logs
@@ -719,8 +717,10 @@ class LBRYElectrumX(asyncio.Protocol):
         self.sv_seen = False
         self.protocol_tuple = self.PROTOCOL_MIN
         self.protocol_string = None
+
         self.daemon = self.session_manager.daemon
-        self.db: 'HubDB' = self.session_manager.db
+        self.db = self.session_manager.db
+        self.mempool = self.session_manager.mempool
 
     def data_received(self, framed_message):
         """Called by asyncio when a message comes in."""
@@ -757,13 +757,11 @@ class LBRYElectrumX(asyncio.Protocol):
         self._pm_task = self.loop.create_task(self._receive_messages())
 
         self.session_id = next(self.session_counter)
-        context = {'conn_id': f'{self.session_id}'}
-        self.logger = logging.getLogger(__name__)  # util.ConnectionLogger(self.logger, context)
+        # context = {'conn_id': f'{self.session_id}'}
+        # self.logger = logging.getLogger(__name__)  # util.ConnectionLogger(self.logger, context)
         self.group = self.session_manager.add_session(self)
         self.session_manager.session_count_metric.labels(version=self.client_version).inc()
-        peer_addr_str = self.peer_address_str()
-        self.logger.info(f'{self.kind} {peer_addr_str}, '
-                         f'{self.session_manager.session_count():,d} total')
+        # self.logger.info(f'{self.kind} {self.peer_address_str()}, {self.session_manager.session_count():,d} total')
 
     def connection_lost(self, exc):
         """Handle client disconnection."""

@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import ipaddress
 import logging
+import logging.handlers
 import typing
 import collections
 from asyncio import get_event_loop, Event
@@ -23,8 +24,17 @@ HISTOGRAM_BUCKETS = (
 )
 
 
-def setup_logging():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-4s %(name)s:%(lineno)d: %(message)s")
+def setup_logging(log_path: str):
+    log = logging.getLogger('scribe')
+    fmt = logging.Formatter("%(asctime)s %(levelname)-4s %(name)s:%(lineno)d: %(message)s")
+    handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=1024*1024*5, backupCount=2)
+    handler.setFormatter(fmt)
+    log.addHandler(handler)
+    handler = logging.StreamHandler()
+    handler.setFormatter(fmt)
+    log.addHandler(handler)
+
+    log.setLevel(logging.INFO)
     logging.getLogger('aiohttp').setLevel(logging.WARNING)
     logging.getLogger('elasticsearch').setLevel(logging.WARNING)
 

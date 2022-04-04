@@ -1,3 +1,4 @@
+import os
 import logging
 import traceback
 import argparse
@@ -7,14 +8,16 @@ from scribe.blockchain.service import BlockchainProcessorService
 
 
 def main():
-    setup_logging()
     parser = argparse.ArgumentParser(
         prog='scribe'
     )
     Env.contribute_to_arg_parser(parser)
     args = parser.parse_args()
+
     try:
-        block_processor = BlockchainProcessorService(Env.from_arg_parser(args))
+        env = Env.from_arg_parser(args)
+        setup_logging(os.path.join(env.db_dir, 'scribe.log'))
+        block_processor = BlockchainProcessorService(env)
         block_processor.run()
     except Exception:
         traceback.print_exc()

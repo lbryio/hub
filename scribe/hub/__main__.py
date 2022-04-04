@@ -1,3 +1,4 @@
+import os
 import logging
 import traceback
 import argparse
@@ -7,7 +8,6 @@ from scribe.hub.service import HubServerService
 
 
 def main():
-    setup_logging()
     parser = argparse.ArgumentParser(
         prog='scribe-hub'
     )
@@ -15,8 +15,9 @@ def main():
     args = parser.parse_args()
 
     try:
-
-        server = HubServerService(Env.from_arg_parser(args))
+        env = Env.from_arg_parser(args)
+        setup_logging(os.path.join(env.db_dir, 'scribe-hub.log'))
+        server = HubServerService(env)
         server.run()
     except Exception:
         traceback.print_exc()

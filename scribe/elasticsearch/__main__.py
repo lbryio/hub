@@ -1,3 +1,4 @@
+import os
 import logging
 import traceback
 import argparse
@@ -7,7 +8,6 @@ from scribe.elasticsearch.service import ElasticSyncService
 
 
 def main():
-    setup_logging()
     parser = argparse.ArgumentParser(
         prog='scribe-elastic-sync'
     )
@@ -16,7 +16,9 @@ def main():
     args = parser.parse_args()
 
     try:
-        server = ElasticSyncService(Env.from_arg_parser(args))
+        env = Env.from_arg_parser(args)
+        setup_logging(os.path.join(env.db_dir, 'scribe-elastic-sync.log'))
+        server = ElasticSyncService(env)
         server.run(args.reindex)
     except Exception:
         traceback.print_exc()
