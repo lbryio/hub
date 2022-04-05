@@ -3,7 +3,7 @@ import time
 import asyncio
 from scribe.blockchain.daemon import LBCDaemon
 from scribe.hub.session import SessionManager
-from scribe.hub.mempool import MemPool
+from scribe.hub.mempool import HubMemPool
 from scribe.hub.udp import StatusServer
 from scribe.service import BlockchainReaderService
 from scribe.elasticsearch import ElasticNotifierClientProtocol
@@ -16,7 +16,7 @@ class HubServerService(BlockchainReaderService):
         self.mempool_notifications = set()
         self.status_server = StatusServer()
         self.daemon = LBCDaemon(env.coin, env.daemon_url)  # only needed for broadcasting txs
-        self.mempool = MemPool(self.env.coin, self.db)
+        self.mempool = HubMemPool(self.env.coin, self.db)
         self.session_manager = SessionManager(
             env, self.db, self.mempool, self.daemon,
             self.shutdown_event,

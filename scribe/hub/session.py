@@ -30,7 +30,7 @@ if typing.TYPE_CHECKING:
     from scribe.db import HubDB
     from scribe.env import Env
     from scribe.blockchain.daemon import LBCDaemon
-    from scribe.hub.mempool import MemPool
+    from scribe.hub.mempool import HubMemPool
 
 BAD_REQUEST = 1
 DAEMON_ERROR = 2
@@ -38,11 +38,8 @@ DAEMON_ERROR = 2
 log = logging.getLogger(__name__)
 
 
-
 SignatureInfo = namedtuple('SignatureInfo', 'min_args max_args '
                            'required_names other_names')
-
-
 
 
 def scripthash_to_hashX(scripthash: str) -> bytes:
@@ -136,7 +133,6 @@ class SessionManager:
     tx_replied_count_metric = Counter("replied_transaction", "Number of transactions responded", namespace=NAMESPACE)
     urls_to_resolve_count_metric = Counter("urls_to_resolve", "Number of urls to resolve", namespace=NAMESPACE)
     resolved_url_count_metric = Counter("resolved_url", "Number of resolved urls", namespace=NAMESPACE)
-
     interrupt_count_metric = Counter("interrupt", "Number of interrupted queries", namespace=NAMESPACE)
     db_operational_error_metric = Counter(
         "operational_error", "Number of queries that raised operational errors", namespace=NAMESPACE
@@ -168,7 +164,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'MemPool',
+    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'HubMemPool',
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
