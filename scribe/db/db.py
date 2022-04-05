@@ -850,6 +850,14 @@ class HubDB:
         self.prefix_db.close()
         self.prefix_db = None
 
+    def get_hashX_status(self, hashX: bytes):
+        mempool_status = self.prefix_db.hashX_mempool_status.get(hashX)
+        if mempool_status:
+            return mempool_status.status.hex()
+        status = self.prefix_db.hashX_status.get(hashX)
+        if status:
+            return status.status.hex()
+
     def get_tx_hash(self, tx_num: int) -> bytes:
         if self._cache_all_tx_hashes:
             return self.total_transactions[tx_num]

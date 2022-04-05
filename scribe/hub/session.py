@@ -1101,12 +1101,7 @@ class LBRYElectrumX(asyncio.Protocol):
         return len(self.hashX_subs)
 
     async def get_hashX_status(self, hashX: bytes):
-        mempool_status = self.db.prefix_db.hashX_mempool_status.get(hashX)
-        if mempool_status:
-            return mempool_status.status.hex()
-        status = self.db.prefix_db.hashX_status.get(hashX)
-        if status:
-            return status.status.hex()
+        return await self.loop.run_in_executor(self.db._executor, self.db.get_hashX_status, hashX)
 
     async def send_history_notifications(self, *hashXes: typing.Iterable[bytes]):
         notifications = []
