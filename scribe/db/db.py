@@ -1003,7 +1003,7 @@ class HubDB:
                     ],
                     'pos': tx_pos
                 }
-            if tx_height + 10 < self.db_height:
+            if tx_height > 0 and tx_height + 10 < self.db_height:
                 self._tx_and_merkle_cache[tx_hash] = tx, merkle
         return None if not tx else tx.hex(), merkle
 

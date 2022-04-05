@@ -1657,7 +1657,10 @@ class LBRYElectrumX(asyncio.Protocol):
                                         f'network rules.\n\n{message}\n[{raw_tx}]')
 
     async def transaction_info(self, tx_hash: str):
-        return (await self.transaction_get_batch(tx_hash))[tx_hash]
+        tx_info = (await self.transaction_get_batch(tx_hash))[tx_hash]
+        if tx_info[0] is None and tx_info[1]['block_height'] == -1:
+            return RPCError(BAD_REQUEST, "No such mempool or blockchain transaction.")
+        return tx_info
 
     async def transaction_get_batch(self, *tx_hashes):
         self.session_manager.tx_request_count_metric.inc(len(tx_hashes))
@@ -1683,6 +1686,7 @@ class LBRYElectrumX(asyncio.Protocol):
         raw_tx = await asyncio.get_event_loop().run_in_executor(None, self.db.get_raw_tx, tx_hash_bytes)
         if raw_tx:
             return raw_tx.hex()
+        return RPCError("No such mempool or blockchain transaction.")
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
         """Return a merkle branch to a transaction.
