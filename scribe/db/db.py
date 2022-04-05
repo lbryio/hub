@@ -23,6 +23,7 @@ from scribe.db.common import ResolveResult, STREAM_TYPES, CLAIM_TYPES, ExpandedR
 from scribe.db.prefixes import PendingActivationValue, ClaimTakeoverValue, ClaimToTXOValue, PrefixDB
 from scribe.db.prefixes import ACTIVATED_CLAIM_TXO_TYPE, ACTIVATED_SUPPORT_TXO_TYPE, EffectiveAmountKey
 from scribe.db.prefixes import PendingActivationKey, TXOToClaimValue, DBStatePrefixRow, MempoolTXPrefixRow
+from scribe.db.prefixes import HashXMempoolStatusPrefixRow
 
 
 TXO_STRUCT = struct.Struct(b'>LH')
@@ -804,7 +805,8 @@ class HubDB:
         self.prefix_db = PrefixDB(
             db_path, cache_mb=self._cache_MB,
             reorg_limit=self._reorg_limit, max_open_files=self._db_max_open_files,
-            unsafe_prefixes={DBStatePrefixRow.prefix, MempoolTXPrefixRow.prefix}, secondary_path=secondary_path
+            unsafe_prefixes={DBStatePrefixRow.prefix, MempoolTXPrefixRow.prefix, HashXMempoolStatusPrefixRow.prefix},
+            secondary_path=secondary_path
         )
 
         if secondary_path != '':
@@ -1017,7 +1019,7 @@ class HubDB:
         txs_extend = txs.extend
         for hist in self.prefix_db.hashX_history.iterate(prefix=(hashX,), include_key=False):
             txs_extend(hist)
-            if len(txs) >= limit:
+            if limit and len(txs) >= limit:
                 break
         return txs
 

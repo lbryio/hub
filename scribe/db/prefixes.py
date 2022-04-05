@@ -1623,6 +1623,76 @@ class TouchedHashXPrefixRow(PrefixRow):
         return cls.pack_key(height), cls.pack_value(touched)
 
 
+class HashXStatusKey(NamedTuple):
+    hashX: bytes
+
+
+class HashXStatusValue(NamedTuple):
+    status: bytes
+
+
+class HashXStatusPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.hashX_status.value
+    key_struct = struct.Struct(b'>20s')
+    value_struct = struct.Struct(b'32s')
+
+    key_part_lambdas = [
+        lambda: b'',
+        struct.Struct(b'>20s').pack
+    ]
+
+    @classmethod
+    def pack_key(cls, hashX: bytes):
+        return super().pack_key(hashX)
+
+    @classmethod
+    def unpack_key(cls, key: bytes) -> HashXStatusKey:
+        return HashXStatusKey(*super().unpack_key(key))
+
+    @classmethod
+    def pack_value(cls, status: bytes) -> bytes:
+        return super().pack_value(status)
+
+    @classmethod
+    def unpack_value(cls, data: bytes) -> HashXStatusValue:
+        return HashXStatusValue(*cls.value_struct.unpack(data))
+
+    @classmethod
+    def pack_item(cls, hashX: bytes,  status: bytes):
+        return cls.pack_key(hashX), cls.pack_value(status)
+
+
+class HashXMempoolStatusPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.hashX_mempool_status.value
+    key_struct = struct.Struct(b'>20s')
+    value_struct = struct.Struct(b'32s')
+
+    key_part_lambdas = [
+        lambda: b'',
+        struct.Struct(b'>20s').pack
+    ]
+
+    @classmethod
+    def pack_key(cls, hashX: bytes):
+        return super().pack_key(hashX)
+
+    @classmethod
+    def unpack_key(cls, key: bytes) -> HashXStatusKey:
+        return HashXStatusKey(*super().unpack_key(key))
+
+    @classmethod
+    def pack_value(cls, status: bytes) -> bytes:
+        return super().pack_value(status)
+
+    @classmethod
+    def unpack_value(cls, data: bytes) -> HashXStatusValue:
+        return HashXStatusValue(*cls.value_struct.unpack(data))
+
+    @classmethod
+    def pack_item(cls, hashX: bytes,  status: bytes):
+        return cls.pack_key(hashX), cls.pack_value(status)
+
+
 class PrefixDB(BasePrefixDB):
     def __init__(self, path: str, cache_mb: int = 128, reorg_limit: int = 200, max_open_files: int = 64,
                  secondary_path: str = '', unsafe_prefixes: Optional[typing.Set[bytes]] = None):
@@ -1662,6 +1732,8 @@ class PrefixDB(BasePrefixDB):
         self.mempool_tx = MempoolTXPrefixRow(db, self._op_stack)
         self.trending_notification = TrendingNotificationPrefixRow(db, self._op_stack)
         self.touched_hashX = TouchedHashXPrefixRow(db, self._op_stack)
+        self.hashX_status = HashXStatusPrefixRow(db, self._op_stack)
+        self.hashX_mempool_status = HashXMempoolStatusPrefixRow(db, self._op_stack)
 
 
 def auto_decode_item(key: bytes, value: bytes) -> Union[Tuple[NamedTuple, NamedTuple], Tuple[bytes, bytes]]:

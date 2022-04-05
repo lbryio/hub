@@ -1101,18 +1101,12 @@ class LBRYElectrumX(asyncio.Protocol):
         return len(self.hashX_subs)
 
     async def get_hashX_status(self, hashX: bytes):
-        mempool_history = self.mempool.transaction_summaries(hashX)
-        history = ''.join(f'{hash_to_hex_str(tx_hash)}:'
-                          f'{height:d}:'
-                          for tx_hash, height in await self.session_manager.limited_history(hashX))
-        history += ''.join(f'{hash_to_hex_str(tx.hash)}:'
-                           f'{-tx.has_unconfirmed_inputs:d}:'
-                           for tx in mempool_history)
-        if history:
-            status = sha256(history.encode()).hex()
-        else:
-            status = None
-        return history, status, len(mempool_history) > 0
+        mempool_status = self.db.prefix_db.hashX_mempool_status.get(hashX)
+        if mempool_status:
+            return mempool_status.status.hex()
+        status = self.db.prefix_db.hashX_status.get(hashX)
+        if status:
+            return status.status.hex()
 
     async def send_history_notifications(self, *hashXes: typing.Iterable[bytes]):
         notifications = []
@@ -1123,14 +1117,12 @@ class LBRYElectrumX(asyncio.Protocol):
             else:
                 method = 'blockchain.address.subscribe'
             start = time.perf_counter()
-            history, status, mempool_status = await self.get_hashX_status(hashX)
-            if mempool_status:
-                self.session_manager.mempool_statuses[hashX] = status
-            else:
-                self.session_manager.mempool_statuses.pop(hashX, None)
-
-            self.session_manager.address_history_metric.observe(time.perf_counter() - start)
+            status = await self.get_hashX_status(hashX)
+            duration = time.perf_counter() - start
+            self.session_manager.address_history_metric.observe(duration)
             notifications.append((method, (alias, status)))
+            if duration > 30:
+                self.logger.warning("slow history notification (%s) for '%s'", duration, alias)
 
         start = time.perf_counter()
         self.session_manager.notifications_in_flight_metric.inc()
@@ -1336,11 +1328,7 @@ class LBRYElectrumX(asyncio.Protocol):
         """
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if it has unconfirmed inputs, otherwise 0
-        _, status, has_mempool_history = await self.get_hashX_status(hashX)
-        if has_mempool_history:
-            self.session_manager.mempool_statuses[hashX] = status
-        else:
-            self.session_manager.mempool_statuses.pop(hashX, None)
+        status = await self.get_hashX_status(hashX)
         return status
 
     async def hashX_listunspent(self, hashX: bytes):

@@ -46,6 +46,8 @@ class DB_PREFIXES(enum.Enum):
     trending_notifications = b'c'
     mempool_tx = b'd'
     touched_hashX = b'e'
+    hashX_status = b'f'
+    hashX_mempool_status = b'g'
 
 
 COLUMN_SETTINGS = {}  # this is updated by the PrefixRow metaclass
