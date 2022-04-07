@@ -10,8 +10,6 @@ if typing.TYPE_CHECKING:
 FROM_VERSION = 7
 TO_VERSION = 8
 
-log = logging.getLogger()
-
 
 def get_all_hashXs(db):
     def iterator():
@@ -48,6 +46,7 @@ def hashX_status_from_history(db: 'HubDB', history: bytes) -> bytes:
 
 
 def migrate(db):
+    log = logging.getLogger(__name__)
     start = time.perf_counter()
     prefix_db = db.prefix_db
     hashXs = get_all_hashXs(db)
