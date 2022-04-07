@@ -32,7 +32,7 @@ TXO_STRUCT_pack = TXO_STRUCT.pack
 
 
 class HubDB:
-    DB_VERSIONS = HIST_DB_VERSIONS = [7]
+    DB_VERSIONS = [7, 8]
 
     def __init__(self, coin, db_dir: str, cache_MB: int = 512, reorg_limit: int = 200,
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,

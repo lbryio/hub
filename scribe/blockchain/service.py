@@ -1637,6 +1637,16 @@ class BlockchainProcessorService(BlockchainService):
         await self.run_in_thread_with_lock(flush)
 
     def _iter_start_tasks(self):
+        while self.db.db_version < max(self.db.DB_VERSIONS):
+            if self.db.db_version == 7:
+                from scribe.db.migrators.migrate7to8 import migrate, FROM_VERSION, TO_VERSION
+            else:
+                raise RuntimeError("unknown db version")
+            self.log.warning(f"migrating database from version {FROM_VERSION} to version {TO_VERSION}")
+            migrate(self.db)
+            self.log.info("finished migration")
+            self.db.read_db_state()
+
         self.height = self.db.db_height
         self.tip = self.db.db_tip
         self.tx_count = self.db.db_tx_count
