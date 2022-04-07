@@ -851,12 +851,12 @@ class HubDB:
         self.prefix_db = None
 
     def get_hashX_status(self, hashX: bytes):
-        mempool_status = self.prefix_db.hashX_mempool_status.get(hashX)
+        mempool_status = self.prefix_db.hashX_mempool_status.get(hashX, deserialize_value=False)
         if mempool_status:
-            return mempool_status.status.hex()
-        status = self.prefix_db.hashX_status.get(hashX)
+            return mempool_status.hex()
+        status = self.prefix_db.hashX_status.get(hashX, deserialize_value=False)
         if status:
-            return status.status.hex()
+            return status.hex()
 
     def get_tx_hash(self, tx_num: int) -> bytes:
         if self._cache_all_tx_hashes:
