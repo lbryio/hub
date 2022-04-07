@@ -11,10 +11,11 @@ from scribe import PROMETHEUS_NAMESPACE
 from scribe.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from scribe.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
 from scribe.error.base import ChainError
-from scribe.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem
+from scribe.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256
 from scribe.blockchain.daemon import LBCDaemon
 from scribe.blockchain.transaction import Tx, TxOutput, TxInput, Block
 from scribe.blockchain.prefetcher import Prefetcher
+from scribe.blockchain.mempool import MemPool
 from scribe.schema.url import normalize_name
 from scribe.service import BlockchainService
 if typing.TYPE_CHECKING:
@@ -45,6 +46,7 @@ class BlockchainProcessorService(BlockchainService):
     def __init__(self, env: 'Env'):
         super().__init__(env, secondary_name='', thread_workers=1, thread_prefix='block-processor')
         self.daemon = LBCDaemon(env.coin, env.daemon_url)
+        self.mempool = MemPool(env.coin, self.db)
         self.coin = env.coin
         self.wait_for_blocks_duration = 0.1
         self._ready_to_stop = asyncio.Event()
@@ -147,6 +149,10 @@ class BlockchainProcessorService(BlockchainService):
             }
 
         def update_mempool(unsafe_commit, mempool_prefix, to_put, to_delete):
+            self.mempool.remove(to_delete)
+            touched_hashXs = self.mempool.update_mempool(to_put)
+            for hashX in touched_hashXs:
+                self._get_update_hashX_mempool_status_ops(hashX)
             for tx_hash, raw_tx in to_put:
                 mempool_prefix.stage_put((tx_hash,), (raw_tx,))
             for tx_hash, raw_tx in to_delete.items():
@@ -157,17 +163,17 @@ class BlockchainProcessorService(BlockchainService):
             current_mempool = await self.run_in_thread(fetch_mempool, self.db.prefix_db.mempool_tx)
             _to_put = []
             try:
-                mempool_hashes = await self.daemon.mempool_hashes()
+                mempool_txids = await self.daemon.mempool_hashes()
             except (TypeError, RPCError) as err:
                 self.log.exception("failed to get mempool tx hashes, reorg underway? (%s)", err)
                 return
-            for hh in mempool_hashes:
-                tx_hash = bytes.fromhex(hh)[::-1]
+            for mempool_txid in mempool_txids:
+                tx_hash = bytes.fromhex(mempool_txid)[::-1]
                 if tx_hash in current_mempool:
                     current_mempool.pop(tx_hash)
                 else:
                     try:
-                        _to_put.append((tx_hash, bytes.fromhex(await self.daemon.getrawtransaction(hh))))
+                        _to_put.append((tx_hash, bytes.fromhex(await self.daemon.getrawtransaction(mempool_txid))))
                     except (TypeError, RPCError):
                         self.log.warning("failed to get a mempool tx, reorg underway?")
                         return
@@ -1238,6 +1244,50 @@ class BlockchainProcessorService(BlockchainService):
         self.touched_claims_to_send_es.difference_update(self.removed_claim_hashes)
         self.removed_claims_to_send_es.update(self.removed_claim_hashes)
 
+    def _get_update_hashX_status_ops(self, hashX: bytes, new_history: List[Tuple[bytes, int]]):
+        existing = self.db.prefix_db.hashX_status.get(hashX)
+        if existing:
+            self.db.prefix_db.hashX_status.stage_delete((hashX,), existing)
+        tx_nums = self.db.read_history(hashX, limit=None)
+        history = ''
+        for tx_num in tx_nums:
+            history += f'{hash_to_hex_str(self.db.get_tx_hash(tx_num) )}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+        for tx_hash, height in new_history:
+            history += f'{hash_to_hex_str(tx_hash)}:{height:d}:'
+        if history:
+            status = sha256(history.encode())
+            self.db.prefix_db.hashX_status.stage_put((hashX,), (status,))
+
+    def _get_update_hashX_mempool_status_ops(self, hashX: bytes):
+        existing = self.db.prefix_db.hashX_mempool_status.get(hashX)
+        if existing:
+            self.db.prefix_db.hashX_mempool_status.stage_delete((hashX,), existing)
+        tx_nums = self.db.read_history(hashX, limit=None)
+        history = ''
+        for tx_num in tx_nums:
+            history += f'{hash_to_hex_str(self.db.get_tx_hash(tx_num) )}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+        history += self.mempool.mempool_history(hashX)
+        if history:
+            status = sha256(history.encode())
+            self.db.prefix_db.hashX_mempool_status.stage_put((hashX,), (status,))
+
+    def _get_compactify_hashX_history_ops(self, height: int, hashX: bytes):
+        if height > self.env.reorg_limit:  # compactify existing history
+            hist_txs = b''
+            # accumulate and delete all of the tx histories between height 1 and current - reorg_limit
+            for k, hist in self.db.prefix_db.hashX_history.iterate(
+                    start=(hashX, 1), stop=(hashX, height - self.env.reorg_limit),
+                    deserialize_key=False, deserialize_value=False):
+                hist_txs += hist
+                self.db.prefix_db.stage_raw_delete(k, hist)
+            if hist_txs:
+                # add the accumulated histories onto the existing compacted history at height 0
+                key = self.db.prefix_db.hashX_history.pack_key(hashX, 0)
+                existing = self.db.prefix_db.get(key)
+                if existing is not None:
+                    self.db.prefix_db.stage_raw_delete(key, existing)
+                self.db.prefix_db.stage_raw_put(key, (existing or b'') + hist_txs)
+
     def advance_block(self, block: Block):
         height = self.height + 1
         # print("advance ", height)
@@ -1326,22 +1376,16 @@ class BlockchainProcessorService(BlockchainService):
 
         self.db.prefix_db.tx_count.stage_put(key_args=(height,), value_args=(tx_count,))
 
+        for k, v in self.db.prefix_db.hashX_mempool_status.iterate(
+            start=(b'\x00' * 20, ), stop=(b'\xff' * 20, ), deserialize_key=False, deserialize_value=False):
+            self.db.prefix_db.stage_raw_delete(k, v)
+
         for hashX, new_history in self.hashXs_by_tx.items():
-            if height > self.env.reorg_limit:  # compactify existing history
-                hist_txs = b''
-                # accumulate and delete all of the tx histories between height 1 and current - reorg_limit
-                for k, hist in self.db.prefix_db.hashX_history.iterate(
-                        start=(hashX, 1), stop=(hashX, height - self.env.reorg_limit),
-                        deserialize_key=False, deserialize_value=False):
-                    hist_txs += hist
-                    self.db.prefix_db.stage_raw_delete(k, hist)
-                if hist_txs:
-                    # add the accumulated histories onto the existing compacted history at height 0
-                    key = self.db.prefix_db.hashX_history.pack_key(hashX, 0)
-                    existing = self.db.prefix_db.get(key)
-                    if existing is not None:
-                        self.db.prefix_db.stage_raw_delete(key, existing)
-                    self.db.prefix_db.stage_raw_put(key, (existing or b'') + hist_txs)
+            # TODO: combine this with compaction so that we only read the history once
+            self._get_update_hashX_status_ops(
+                hashX, [(self.pending_transactions[tx_num], height) for tx_num in new_history]
+            )
+            self._get_compactify_hashX_history_ops(height, hashX)
             if not new_history:
                 continue
             self.db.prefix_db.hashX_history.stage_put(key_args=(hashX, height), value_args=(new_history,))
@@ -1418,6 +1462,7 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transactions.clear()
         self.pending_support_amount_change.clear()
         self.touched_hashXs.clear()
+        self.mempool.clear()
 
     def backup_block(self):
         assert len(self.db.prefix_db._op_stack) == 0
@@ -1592,6 +1637,16 @@ class BlockchainProcessorService(BlockchainService):
         await self.run_in_thread_with_lock(flush)
 
     def _iter_start_tasks(self):
+        while self.db.db_version < max(self.db.DB_VERSIONS):
+            if self.db.db_version == 7:
+                from scribe.db.migrators.migrate7to8 import migrate, FROM_VERSION, TO_VERSION
+            else:
+                raise RuntimeError("unknown db version")
+            self.log.warning(f"migrating database from version {FROM_VERSION} to version {TO_VERSION}")
+            migrate(self.db)
+            self.log.info("finished migration")
+            self.db.read_db_state()
+
         self.height = self.db.db_height
         self.tip = self.db.db_tip
         self.tx_count = self.db.db_tx_count

@@ -41,7 +41,7 @@ mempool_process_time_metric = Histogram(
 )
 
 
-class MemPool:
+class HubMemPool:
     def __init__(self, coin, db: 'HubDB', refresh_secs=1.0):
         self.coin = coin
         self._db = db

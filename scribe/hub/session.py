@@ -30,7 +30,7 @@ if typing.TYPE_CHECKING:
     from scribe.db import HubDB
     from scribe.env import Env
     from scribe.blockchain.daemon import LBCDaemon
-    from scribe.hub.mempool import MemPool
+    from scribe.hub.mempool import HubMemPool
 
 BAD_REQUEST = 1
 DAEMON_ERROR = 2
@@ -38,11 +38,8 @@ DAEMON_ERROR = 2
 log = logging.getLogger(__name__)
 
 
-
 SignatureInfo = namedtuple('SignatureInfo', 'min_args max_args '
                            'required_names other_names')
-
-
 
 
 def scripthash_to_hashX(scripthash: str) -> bytes:
@@ -136,7 +133,6 @@ class SessionManager:
     tx_replied_count_metric = Counter("replied_transaction", "Number of transactions responded", namespace=NAMESPACE)
     urls_to_resolve_count_metric = Counter("urls_to_resolve", "Number of urls to resolve", namespace=NAMESPACE)
     resolved_url_count_metric = Counter("resolved_url", "Number of resolved urls", namespace=NAMESPACE)
-
     interrupt_count_metric = Counter("interrupt", "Number of interrupted queries", namespace=NAMESPACE)
     db_operational_error_metric = Counter(
         "operational_error", "Number of queries that raised operational errors", namespace=NAMESPACE
@@ -168,7 +164,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'MemPool',
+    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'HubMemPool',
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
@@ -1105,18 +1101,7 @@ class LBRYElectrumX(asyncio.Protocol):
         return len(self.hashX_subs)
 
     async def get_hashX_status(self, hashX: bytes):
-        mempool_history = self.mempool.transaction_summaries(hashX)
-        history = ''.join(f'{hash_to_hex_str(tx_hash)}:'
-                          f'{height:d}:'
-                          for tx_hash, height in await self.session_manager.limited_history(hashX))
-        history += ''.join(f'{hash_to_hex_str(tx.hash)}:'
-                           f'{-tx.has_unconfirmed_inputs:d}:'
-                           for tx in mempool_history)
-        if history:
-            status = sha256(history.encode()).hex()
-        else:
-            status = None
-        return history, status, len(mempool_history) > 0
+        return await self.loop.run_in_executor(self.db._executor, self.db.get_hashX_status, hashX)
 
     async def send_history_notifications(self, *hashXes: typing.Iterable[bytes]):
         notifications = []
@@ -1127,14 +1112,12 @@ class LBRYElectrumX(asyncio.Protocol):
             else:
                 method = 'blockchain.address.subscribe'
             start = time.perf_counter()
-            history, status, mempool_status = await self.get_hashX_status(hashX)
-            if mempool_status:
-                self.session_manager.mempool_statuses[hashX] = status
-            else:
-                self.session_manager.mempool_statuses.pop(hashX, None)
-
-            self.session_manager.address_history_metric.observe(time.perf_counter() - start)
+            status = await self.get_hashX_status(hashX)
+            duration = time.perf_counter() - start
+            self.session_manager.address_history_metric.observe(duration)
             notifications.append((method, (alias, status)))
+            if duration > 30:
+                self.logger.warning("slow history notification (%s) for '%s'", duration, alias)
 
         start = time.perf_counter()
         self.session_manager.notifications_in_flight_metric.inc()
@@ -1340,11 +1323,7 @@ class LBRYElectrumX(asyncio.Protocol):
         """
         # Note history is ordered and mempool unordered in electrum-server
         # For mempool, height is -1 if it has unconfirmed inputs, otherwise 0
-        _, status, has_mempool_history = await self.get_hashX_status(hashX)
-        if has_mempool_history:
-            self.session_manager.mempool_statuses[hashX] = status
-        else:
-            self.session_manager.mempool_statuses.pop(hashX, None)
+        status = await self.get_hashX_status(hashX)
         return status
 
     async def hashX_listunspent(self, hashX: bytes):
