@@ -827,6 +827,8 @@ class LBRYElectrumX(asyncio.Protocol):
                 coro = self.scripthash_get_mempool
             elif method == 'blockchain.scripthash.subscribe':
                 coro = self.scripthash_subscribe
+            elif method == 'blockchain.scripthash.get_balance':
+                coro = self.scripthash_get_balance
             elif method == 'blockchain.transaction.broadcast':
                 coro = self.transaction_broadcast
             elif method == 'blockchain.transaction.get':
@@ -1409,10 +1411,10 @@ class LBRYElectrumX(asyncio.Protocol):
         unconfirmed = self.mempool.balance_delta(hashX)
         return {'confirmed': confirmed, 'unconfirmed': unconfirmed}
 
-    # async def scripthash_get_balance(self, scripthash):
-    #     """Return the confirmed and unconfirmed balance of a scripthash."""
-    #     hashX = scripthash_to_hashX(scripthash)
-    #     return await self.get_balance(hashX)
+    async def scripthash_get_balance(self, scripthash):
+        """Return the confirmed and unconfirmed balance of a scripthash."""
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.get_balance(hashX)
 
     def unconfirmed_history(self, hashX):
         # Note unconfirmed history is unordered in electrum-server
