@@ -827,8 +827,12 @@ class LBRYElectrumX(asyncio.Protocol):
                 coro = self.scripthash_get_mempool
             elif method == 'blockchain.scripthash.subscribe':
                 coro = self.scripthash_subscribe
+            elif method == 'blockchain.scripthash.unsubscribe':
+                coro = self.scripthash_unsubscribe
             elif method == 'blockchain.scripthash.get_balance':
                 coro = self.scripthash_get_balance
+            elif method == 'blockchain.scripthash.listunspent':
+                coro = self.scripthash_listunspent
             elif method == 'blockchain.transaction.broadcast':
                 coro = self.transaction_broadcast
             elif method == 'blockchain.transaction.get':
@@ -1158,7 +1162,7 @@ class LBRYElectrumX(asyncio.Protocol):
     #         self.session_manager.pending_query_metric.dec()
     #         self.session_manager.executor_time_metric.observe(time.perf_counter() - start)
 
-    async def mempool_compact_histogram(self):
+    async def mempool_compact_histogram(self):  # TODO: fix this
         return [] #self.mempool.compact_fee_histogram()
 
     async def claimtrie_search(self, **kwargs):
@@ -1441,10 +1445,10 @@ class LBRYElectrumX(asyncio.Protocol):
         hashX = scripthash_to_hashX(scripthash)
         return self.unconfirmed_history(hashX)
 
-    # async def scripthash_listunspent(self, scripthash):
-    #     """Return the list of UTXOs of a scripthash."""
-    #     hashX = scripthash_to_hashX(scripthash)
-    #     return await self.hashX_listunspent(hashX)
+    async def scripthash_listunspent(self, scripthash):
+        """Return the list of UTXOs of a scripthash."""
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.hashX_listunspent(hashX)
 
     async def scripthash_subscribe(self, scripthash):
         """Subscribe to a script hash.
@@ -1452,6 +1456,10 @@ class LBRYElectrumX(asyncio.Protocol):
         scripthash: the SHA256 hash of the script to subscribe to"""
         hashX = scripthash_to_hashX(scripthash)
         return await self.hashX_subscribe(hashX, scripthash)
+
+    async def scripthash_unsubscribe(self, scripthash: str):
+        hashX = scripthash_to_hashX(scripthash)
+        return await self.hashX_unsubscribe(hashX, scripthash)
 
     async def _merkle_proof(self, cp_height, height):
         max_height = self.db.db_height
