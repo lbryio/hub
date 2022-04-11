@@ -415,8 +415,6 @@ class ResolveCommand(BaseResolveTestCase):
         uri = 'lbry://@abc/on-channel-claim'
         # now, claim something on this channel (it will update the invalid claim, but we save and forcefully restore)
         valid_claim = await self.stream_create('on-channel-claim', '0.00000001', channel_id=channel['claim_id'])
-        print("sleeeeeeeeeping.....")
-        time.sleep(1)  # FIXME: don't wait for the claim to be saved
         # resolves normally
         response = await self.resolve(uri)
         self.assertTrue(response['is_channel_signature_valid'])
@@ -1536,6 +1534,7 @@ class ResolveAfterReorg(BaseResolveTestCase):
         self.assertListEqual(block_txs, list(txs.keys()), msg='leveldb/lbrycrd transactions are of order')
 
     async def test_reorg(self):
+        await asyncio.wait_for(self.on_header(206), 3.0)
         self.assertEqual(self.ledger.headers.height, 206)
 
         channel_name = '@abc'
@@ -1587,8 +1586,6 @@ class ResolveAfterReorg(BaseResolveTestCase):
         )
 
         await self.stream_abandon(stream_id)
-        print("Sleeeeeeeping to wait for abandoned stream to be removed")
-        time.sleep(1)
         self.assertNotIn('error', await self.resolve(channel_name))
         self.assertIn('error', await self.resolve(stream_name))
         self.assertEqual(channel_id, (await self.assertMatchWinningClaim(channel_name)).claim_hash.hex())
@@ -1596,16 +1593,12 @@ class ResolveAfterReorg(BaseResolveTestCase):
         # TODO: check @abc/foo too
 
         await self.reorg(206)
-        print("Sleeeeeeeping to wait for reorg")
-        time.sleep(1)
         self.assertNotIn('error', await self.resolve(channel_name))
         self.assertIn('error', await self.resolve(stream_name))
         self.assertEqual(channel_id, (await self.assertMatchWinningClaim(channel_name)).claim_hash.hex())
         await self.assertNoClaimForName(stream_name)
 
         await self.channel_abandon(channel_id)
-        print("Sleeeeeeeping to wait for abandoned channel to be removed")
-        time.sleep(1)
         self.assertIn('error', await self.resolve(channel_name))
         self.assertIn('error', await self.resolve(stream_name))
         await self.reorg(206)
@@ -1637,6 +1630,7 @@ class ResolveAfterReorg(BaseResolveTestCase):
         await self.assertBlockHash(208)
 
         claim = await self.resolve('hovercraft')
+
         self.assertEqual(claim['txid'], broadcast_tx.id)
         self.assertEqual(claim['height'], 208)
 
@@ -1644,6 +1638,7 @@ class ResolveAfterReorg(BaseResolveTestCase):
         invalidated_block_hash = (await self.ledger.headers.hash(208)).decode()
         block_207 = await self.blockchain.get_block(invalidated_block_hash)
         self.assertIn(claim['txid'], block_207['tx'])
+        await asyncio.wait_for(self.on_header(208), 3.0)
         self.assertEqual(208, claim['height'])
 
         # reorg the last block dropping our claim tx
@@ -1653,8 +1648,6 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up and verify the reorg
         await asyncio.wait_for(self.on_header(209), 3.0)
-        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
-        time.sleep(1)
         await self.assertBlockHash(207)
         await self.assertBlockHash(208)
         await self.assertBlockHash(209)
@@ -1684,8 +1677,6 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up
         await asyncio.wait_for(self.on_header(210), 3.0)
-        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
-        time.sleep(1)
 
         # verify the claim is in the new block and that it is returned by claim_search
         republished = await self.resolve('hovercraft')
@@ -1719,6 +1710,7 @@ class ResolveAfterReorg(BaseResolveTestCase):
         self.assertEqual(self.ledger.headers.height, 208)
         await self.assertBlockHash(208)
 
+        await asyncio.wait_for(self.on_header(208), 30.0)
         claim = await self.resolve('hovercraft')
         self.assertEqual(claim['txid'], broadcast_tx.id)
         self.assertEqual(claim['height'], 208)
@@ -1736,8 +1728,6 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up and verify the reorg
         await asyncio.wait_for(self.on_header(209), 30.0)
-        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
-        time.sleep(1)
         await self.assertBlockHash(207)
         await self.assertBlockHash(208)
         await self.assertBlockHash(209)
@@ -1767,8 +1757,6 @@ class ResolveAfterReorg(BaseResolveTestCase):
 
         # wait for the client to catch up
         await asyncio.wait_for(self.on_header(210), 1.0)
-        # FIXME: add endpoint in golang to get height and wait for that to hit the right height
-        time.sleep(1)
 
         # verify the claim is in the new block and that it is returned by claim_search
         republished = await self.resolve('hovercraft')

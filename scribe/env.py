@@ -38,8 +38,8 @@ class Env:
                  allow_lan_udp=None, cache_all_tx_hashes=None, cache_all_claim_txos=None, country=None,
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
                  session_timeout=None, drop_client=None, description=None, daily_fee=None,
-                 database_query_timeout=None, db_max_open_files=64, elastic_notifier_host=None,
-                 elastic_notifier_port=None, blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None,
+                 database_query_timeout=None, db_max_open_files=64, elastic_notifier_port=None,
+                 go_hub_notifier_port=None, blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None,
                  peer_announce=None):
         self.logger = logging.getLogger(__name__)
         self.db_dir = db_dir if db_dir is not None else self.required('DB_DIRECTORY')
@@ -49,8 +49,8 @@ class Env:
         self.host = host if host is not None else self.default('HOST', 'localhost')
         self.elastic_host = elastic_host if elastic_host is not None else self.default('ELASTIC_HOST', 'localhost')
         self.elastic_port = elastic_port if elastic_port is not None else self.integer('ELASTIC_PORT', 9200)
-        self.elastic_notifier_host = elastic_notifier_host if elastic_notifier_host is not None else self.default('ELASTIC_NOTIFIER_HOST', 'localhost')
         self.elastic_notifier_port = elastic_notifier_port if elastic_notifier_port is not None else self.integer('ELASTIC_NOTIFIER_PORT', 19080)
+        self.go_hub_notifier_port = go_hub_notifier_port if go_hub_notifier_port is not None else self.integer('GO_HUB_NOTIFIER_PORT', 18080)
 
         self.loop_policy = self.set_event_loop_policy(
             loop_policy if loop_policy is not None else self.default('EVENT_LOOP_POLICY', None)

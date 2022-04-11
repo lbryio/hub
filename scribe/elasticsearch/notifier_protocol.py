@@ -57,7 +57,7 @@ class ElasticNotifierClientProtocol(asyncio.Protocol):
                 await self.connect()
                 first_connect = False
                 synchronized.set()
-                log.info("connected to es notifier")
+                log.warning("connected to es notifier: %d", self.port)
             except Exception as e:
                 if not isinstance(e, asyncio.CancelledError):
                     log.warning("waiting 30s for scribe-elastic-sync notifier to become available (%s:%i)", self.host, self.port)
@@ -75,13 +75,17 @@ class ElasticNotifierClientProtocol(asyncio.Protocol):
         self._lost_connection.clear()
 
     def connection_lost(self, exc) -> None:
+        log.warning("lost connection to notifier port %d: %s", self.port, exc)
         self.transport = None
         self._lost_connection.set()
 
     def data_received(self, data: bytes) -> None:
-        try:
-            height, block_hash = struct.unpack(b'>Q32s', data)
-        except:
-            log.exception("failed to decode %s", (data or b'').hex())
-            raise
-        self.notifications.put_nowait((height, block_hash))
+        log.warning("received data from notifier port %d: %s", self.port, data)
+        while data:
+            chunk, data = data[:40], data[40:]
+            try:
+                height, block_hash = struct.unpack(b'>Q32s', chunk)
+            except:
+                log.exception("failed to decode %s", (chunk or b'').hex())
+                raise
+            self.notifications.put_nowait((height, block_hash))

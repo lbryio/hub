@@ -28,9 +28,17 @@ class HubServerService(BlockchainReaderService):
         self.es_notification_client = ElasticNotifierClientProtocol(
             self.es_notifications, self.env.elastic_notifier_host, self.env.elastic_notifier_port
         )
+        self.go_hub_notifications = asyncio.Queue()
+        self.go_hub_notifications_client = ElasticNotifierClientProtocol(
+            self.go_hub_notifications, '127.0.0.1', self.env.go_hub_notifier_port
+        )
+        self.es_synchronized = asyncio.Event()
+        self.go_hub_synchronized = asyncio.Event()
         self.synchronized = asyncio.Event()
         self._es_height = None
         self._es_block_hash = None
+        self._go_hub_height = None
+        self._go_hub_block_hash = None
 
     def clear_caches(self):
         self.session_manager.clear_caches()
@@ -61,7 +69,9 @@ class HubServerService(BlockchainReaderService):
                 await self.mempool.on_block(touched, height)
                 self.log.info("reader advanced to %i", height)
                 if self._es_height == self.db.db_height:
-                    self.synchronized.set()
+                    self.es_synchronized.set()
+                if self._go_hub_height == self.db.db_height:
+                    self.go_hub_synchronized.set()
         if self.mempool_notifications:
             await self.mempool.on_mempool(
                 set(self.mempool.touched_hashXs), self.mempool_notifications, self.db.db_height
@@ -69,20 +79,62 @@ class HubServerService(BlockchainReaderService):
         self.mempool_notifications.clear()
         self.notifications_to_send.clear()
 
-    async def receive_es_notifications(self, synchronized: asyncio.Event):
+    async def receive_es_notifications(self, synchronized: asyncio.Event): ####
         synchronized.set()
         try:
             while True:
                 self._es_height, self._es_block_hash = await self.es_notifications.get()
                 self.clear_search_cache()
                 if self.last_state and self._es_block_hash == self.last_state.tip:
-                    self.synchronized.set()
+                    self.es_synchronized.set()
                     self.log.info("es and reader are in sync at block %i", self.last_state.height)
                 else:
                     self.log.info("es and reader are not yet in sync (block %s vs %s)", self._es_height,
                                   self.db.db_height)
+        except Exception as e:
+            if not isinstance(e, asyncio.CancelledError):
+                self.log.exception("es notification error: %s", e)
+            raise e
         finally:
             self.es_notification_client.close()
+
+    async def receive_go_hub_notifications(self, synchronized: asyncio.Event): ####
+        synchronized.set()
+        try:
+            while True:
+                self._go_hub_height, self._go_hub_block_hash = await self.go_hub_notifications.get()
+                if self.last_state and self._go_hub_block_hash == self.last_state.tip:
+                    self.go_hub_synchronized.set()
+                    self.log.info("go hub and reader are in sync at block %i", self.last_state.height)
+                else:
+                    self.log.info("go hub and reader are not yet in sync (block %s vs %s)", self._go_hub_height,
+                                  self.db.db_height)
+        except Exception as e:
+            if not isinstance(e, asyncio.CancelledError):
+                self.log.exception("go hub notification error: %s", e)
+            raise e
+        finally:
+            self.go_hub_notifications_client.close()
+    
+
+    async def wait_for_sync(self, synchronized: asyncio.Event):
+        synchronized.set()
+        try:
+            while True:
+                es_sync = asyncio.create_task(self.es_synchronized.wait())
+                go_hub_sync = asyncio.create_task(self.go_hub_synchronized.wait())
+                await asyncio.wait([es_sync, go_hub_sync], return_when=asyncio.FIRST_COMPLETED)
+                if not es_sync.done():
+                    es_sync.cancel()
+                if not go_hub_sync.done():
+                    go_hub_sync.cancel()
+                if self._go_hub_height == self._es_height == self.db.db_height:
+                    self.synchronized.set()
+                    # self.log.info("reader, hub, and es are in sync at block %i", self.db.db_height)
+        except Exception as e:
+            if not isinstance(e, asyncio.CancelledError):
+                self.log.exception("wait_for_sync error: %s", e)
+            raise e
 
     async def start_status_server(self):
         if self.env.udp_port and int(self.env.udp_port):
@@ -93,13 +145,16 @@ class HubServerService(BlockchainReaderService):
 
     def _iter_start_tasks(self):
         yield self.start_status_server()
-        yield self.start_cancellable(self.es_notification_client.maintain_connection)
         yield self.start_cancellable(self.mempool.send_notifications_forever)
+        yield self.start_cancellable(self.es_notification_client.maintain_connection)
+        yield self.start_cancellable(self.go_hub_notifications_client.maintain_connection)
         yield self.start_cancellable(self.refresh_blocks_forever)
         yield self.finished_initial_catch_up.wait()
         self.block_count_metric.set(self.last_state.height)
         yield self.start_prometheus()
         yield self.start_cancellable(self.receive_es_notifications)
+        yield self.start_cancellable(self.receive_go_hub_notifications)
+        yield self.start_cancellable(self.wait_for_sync)
         yield self.session_manager.search_index.start()
         yield self.start_cancellable(self.session_manager.serve, self.mempool)
 
