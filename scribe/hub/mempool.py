@@ -52,6 +52,7 @@ class HubMemPool:
         self.logger = logging.getLogger(__name__)
         self.txs = {}
         self.raw_mempool = {}
+        self.tx_touches = {}
         self.touched_hashXs: typing.DefaultDict[bytes, typing.Set[bytes]] = defaultdict(set)  # None can be a key
         self.refresh_secs = refresh_secs
         self.mempool_process_time_metric = mempool_process_time_metric
@@ -74,18 +75,18 @@ class HubMemPool:
                 self.logger.error("failed to process mempool, retrying later")
                 return set()
             raise err
-
         # hashXs = self.hashXs  # hashX: [tx_hash, ...]
         touched_hashXs = set()
 
         # Remove txs that aren't in mempool anymore
         for tx_hash in set(self.txs).difference(self.raw_mempool.keys()):
             tx = self.txs.pop(tx_hash)
-            tx_hashXs = {hashX for hashX, value in tx.in_pairs}.union({hashX for hashX, value in tx.out_pairs})
+            tx_hashXs = self.tx_touches.pop(tx_hash)
             for hashX in tx_hashXs:
-                if hashX in self.touched_hashXs and tx_hash in self.touched_hashXs[hashX]:
-                    self.touched_hashXs[hashX].remove(tx_hash)
-                    if not self.touched_hashXs[hashX]:
+                if hashX in self.touched_hashXs:
+                    if tx_hash in self.touched_hashXs[hashX]:
+                        self.touched_hashXs[hashX].remove(tx_hash)
+                    if not len(self.touched_hashXs[hashX]):
                         self.touched_hashXs.pop(hashX)
             touched_hashXs.update(tx_hashXs)
 
@@ -133,11 +134,13 @@ class HubMemPool:
             tx.fee = max(0, (sum(v for _, v in tx.prevouts) -
                              sum(v for _, v in tx.out_pairs)))
             self.txs[tx_hash] = tx
+            self.tx_touches[tx_hash] = tx_touches = set()
             # print(f"added {tx_hash[::-1].hex()} reader to mempool")
 
             for hashX, value in itertools.chain(tx.prevouts, tx.out_pairs):
                 self.touched_hashXs[hashX].add(tx_hash)
                 touched_hashXs.add(hashX)
+                tx_touches.add(hashX)
 
         mempool_tx_count_metric.set(len(self.txs))
         mempool_touched_address_count_metric.set(len(self.touched_hashXs))
