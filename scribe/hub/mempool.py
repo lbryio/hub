@@ -4,7 +4,7 @@ import attr
 import typing
 import logging
 from collections import defaultdict
-from prometheus_client import Histogram
+from prometheus_client import Histogram, Gauge
 import rocksdb.errors
 from scribe import PROMETHEUS_NAMESPACE
 from scribe.common import HISTOGRAM_BUCKETS
@@ -38,6 +38,10 @@ NAMESPACE = f"{PROMETHEUS_NAMESPACE}_hub"
 mempool_process_time_metric = Histogram(
     "processed_mempool", "Time to process mempool and notify touched addresses",
     namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
+)
+mempool_tx_count_metric = Gauge("mempool_tx_count", "Transactions in mempool", namespace=NAMESPACE)
+mempool_touched_address_count_metric = Gauge(
+    "mempool_touched_address_count", "Count of addresses touched by transactions in mempool", namespace=NAMESPACE
 )
 
 
@@ -134,6 +138,9 @@ class HubMemPool:
             for hashX, value in itertools.chain(tx.prevouts, tx.out_pairs):
                 self.touched_hashXs[hashX].add(tx_hash)
                 touched_hashXs.add(hashX)
+
+        mempool_tx_count_metric.set(len(self.txs))
+        mempool_touched_address_count_metric.set(len(self.touched_hashXs))
         return touched_hashXs
 
     def transaction_summaries(self, hashX):
