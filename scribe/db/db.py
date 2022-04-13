@@ -863,6 +863,11 @@ class HubDB:
             return self.total_transactions[tx_num]
         return self.prefix_db.tx_hash.get(tx_num, deserialize_value=False)
 
+    def get_tx_hashes(self, tx_nums: List[int]) -> List[Optional[bytes]]:
+        if self._cache_all_tx_hashes:
+            return [None if tx_num > self.db_tx_count else self.total_transactions[tx_num] for tx_num in tx_nums]
+        return self.prefix_db.tx_hash.multi_get([(tx_num,) for tx_num in tx_nums], deserialize_value=False)
+
     def get_raw_mempool_tx(self, tx_hash: bytes) -> Optional[bytes]:
         return self.prefix_db.mempool_tx.get(tx_hash, deserialize_value=False)
 
@@ -1042,10 +1047,11 @@ class HubDB:
         tx_nums = await run_in_executor(self._executor, self.read_history, hashX, limit)
         history = []
         append_history = history.append
-        for tx_num in tx_nums:
-            tx_hash = self.get_tx_hash(tx_num) \
-                if self._cache_all_tx_hashes else await run_in_executor(self._executor, self.get_tx_hash, tx_num)
-            append_history((tx_hash, bisect_right(self.tx_counts, tx_num)))
+        while tx_nums:
+            batch, tx_nums = tx_nums[:100], tx_nums[100:]
+            batch_result = self.get_tx_hashes(batch) if self._cache_all_tx_hashes else await run_in_executor(self._executor, self.get_tx_hashes, batch)
+            for tx_num, tx_hash in zip(batch, batch_result):
+                append_history((tx_hash, bisect_right(self.tx_counts, tx_num)))
             await asyncio.sleep(0)
         return history
 

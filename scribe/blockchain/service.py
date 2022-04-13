@@ -125,8 +125,8 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
-        self.hashX_history_cache = LRUCache(100)
-        self.hashX_full_cache = LRUCache(100)
+        self.hashX_history_cache = LRUCache(1000)
+        self.hashX_full_cache = LRUCache(1000)
 
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
@@ -1255,8 +1255,8 @@ class BlockchainProcessorService(BlockchainService):
         else:
             tx_nums = self.hashX_history_cache[hashX]
         history = ''
-        for tx_num in tx_nums:
-            history += f'{hash_to_hex_str(self.db.get_tx_hash(tx_num))}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+        for tx_num, tx_hash in zip(tx_nums, self.db.get_tx_hashes(tx_nums)):
+            history += f'{hash_to_hex_str(tx_hash)}:{bisect_right(self.db.tx_counts, tx_num):d}:'
         self.hashX_full_cache[hashX] = history
         return history
 
@@ -1269,8 +1269,8 @@ class BlockchainProcessorService(BlockchainService):
         else:
             tx_nums = self.hashX_history_cache[hashX]
         history = ''
-        for tx_num in tx_nums:
-            history += f'{hash_to_hex_str(self.db.get_tx_hash(tx_num))}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+        for tx_num, tx_hash in zip(tx_nums, self.db.get_tx_hashes(tx_nums)):
+            history += f'{hash_to_hex_str(tx_hash)}:{bisect_right(self.db.tx_counts, tx_num):d}:'
         for tx_hash, height in new_history:
             history += f'{hash_to_hex_str(tx_hash)}:{height:d}:'
         if history:

@@ -88,6 +88,22 @@ class PrefixRow(metaclass=PrefixRowType):
         if v:
             return v if not deserialize_value else self.unpack_value(v)
 
+    def multi_get(self, key_args: typing.List[typing.Tuple], fill_cache=True, deserialize_value=True):
+        packed_keys = {tuple(args): self.pack_key(*args) for args in key_args}
+        result = {
+            k[-1]: v for k, v in (
+                self._db.multi_get([(self._column_family, packed_keys[tuple(args)]) for args in key_args],
+                                   fill_cache=fill_cache) or {}
+            ).items()
+        }
+
+        def handle_value(v):
+            return None if v is None else v if not deserialize_value else self.unpack_value(v)
+
+        return [
+            handle_value(result[packed_keys[tuple(k_args)]]) for k_args in key_args
+        ]
+
     def get_pending(self, *key_args, fill_cache=True, deserialize_value=True):
         packed_key = self.pack_key(*key_args)
         last_op = self._op_stack.get_last_op_for_key(packed_key)
