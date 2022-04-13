@@ -125,8 +125,8 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
-        self.hashX_history_cache = LRUCache(100)
-        self.hashX_full_cache = LRUCache(100)
+        self.hashX_history_cache = LRUCache(1000)
+        self.hashX_full_cache = LRUCache(1000)
 
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
