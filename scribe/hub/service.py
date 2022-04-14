@@ -26,7 +26,7 @@ class HubServerService(BlockchainReaderService):
         self.mempool.session_manager = self.session_manager
         self.es_notifications = asyncio.Queue()
         self.es_notification_client = ElasticNotifierClientProtocol(
-            self.es_notifications, '127.0.0.1', self.env.elastic_notifier_port
+            self.es_notifications, self.env.elastic_notifier_host, self.env.elastic_notifier_port
         )
         self.synchronized = asyncio.Event()
         self._es_height = None

@@ -38,8 +38,9 @@ class Env:
                  allow_lan_udp=None, cache_all_tx_hashes=None, cache_all_claim_txos=None, country=None,
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
                  session_timeout=None, drop_client=None, description=None, daily_fee=None,
-                 database_query_timeout=None, db_max_open_files=64, elastic_notifier_port=None,
-                 blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None):
+                 database_query_timeout=None, db_max_open_files=64, elastic_notifier_host=None,
+                 elastic_notifier_port=None, blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None,
+                 peer_announce=None):
         self.logger = logging.getLogger(__name__)
         self.db_dir = db_dir if db_dir is not None else self.required('DB_DIRECTORY')
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
@@ -48,6 +49,7 @@ class Env:
         self.host = host if host is not None else self.default('HOST', 'localhost')
         self.elastic_host = elastic_host if elastic_host is not None else self.default('ELASTIC_HOST', 'localhost')
         self.elastic_port = elastic_port if elastic_port is not None else self.integer('ELASTIC_PORT', 9200)
+        self.elastic_notifier_host = elastic_notifier_host if elastic_notifier_host is not None else self.default('ELASTIC_NOTIFIER_HOST', 'localhost')
         self.elastic_notifier_port = elastic_notifier_port if elastic_notifier_port is not None else self.integer('ELASTIC_NOTIFIER_PORT', 19080)
 
         self.loop_policy = self.set_event_loop_policy(
@@ -309,9 +311,13 @@ class Env:
                             help='Path to SSL key file')
         parser.add_argument('--reorg_limit', default=cls.integer('REORG_LIMIT', 200), type=int, help='Max reorg depth')
         parser.add_argument('--elastic_host', default=cls.default('ELASTIC_HOST', 'localhost'), type=str,
-                            help='elasticsearch host')
+                            help='elasticsearch host, defaults to localhost')
         parser.add_argument('--elastic_port', default=cls.integer('ELASTIC_PORT', 9200), type=int,
-                            help='elasticsearch port')
+                            help='elasticsearch port, defaults to 9200')
+        parser.add_argument('--elastic_notifier_host', default=cls.default('ELASTIC_NOTIFIER_HOST', 'localhost'),
+                            type=str, help='elasticsearch sync notifier host, defaults to localhost')
+        parser.add_argument('--elastic_notifier_port', default=cls.integer('ELASTIC_NOTIFIER_PORT', 19080), type=int,
+                            help='elasticsearch sync notifier port')
         parser.add_argument('--es_index_prefix', default=cls.default('ES_INDEX_PREFIX', ''), type=str)
         parser.add_argument('--loop_policy', default=cls.default('EVENT_LOOP_POLICY', 'default'), type=str,
                             choices=['default', 'uvloop'])
@@ -374,5 +380,6 @@ class Env:
             max_send=args.max_send, max_receive=args.max_receive, max_sessions=args.max_sessions,
             session_timeout=args.session_timeout, drop_client=args.drop_client, description=args.description,
             daily_fee=args.daily_fee, database_query_timeout=(args.query_timeout_ms / 1000),
-            blocking_channel_ids=args.blocking_channel_ids, filtering_channel_ids=args.filtering_channel_ids
+            blocking_channel_ids=args.blocking_channel_ids, filtering_channel_ids=args.filtering_channel_ids,
+            elastic_notifier_host=args.elastic_notifier_host, elastic_notifier_port=args.elastic_notifier_port
         )

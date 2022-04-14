@@ -44,9 +44,10 @@ class ElasticSyncService(BlockchainReaderService):
 
     async def run_es_notifier(self, synchronized: asyncio.Event):
         server = await asyncio.get_event_loop().create_server(
-            lambda: ElasticNotifierProtocol(self._listeners), '127.0.0.1', self.env.elastic_notifier_port
+            lambda: ElasticNotifierProtocol(self._listeners), self.env.elastic_notifier_host, self.env.elastic_notifier_port
         )
-        self.log.info("ES notifier server listening on TCP localhost:%i", self.env.elastic_notifier_port)
+        self.log.info("ES notifier server listening on TCP %s:%i", self.env.elastic_notifier_host,
+                      self.env.elastic_notifier_port)
         synchronized.set()
         async with server:
             await server.serve_forever()
