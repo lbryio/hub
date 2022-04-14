@@ -1013,7 +1013,7 @@ class HubDB:
                 branch, root = self.merkle.branch_and_root(
                     self.get_block_txs(tx_height), tx_pos
                 )
-                tx_infos[tx_hash_bytes[::-1].hex()] = None if not tx else tx.hex(), {
+                merkle = {
                     'block_height': tx_height,
                     'merkle': [
                         hash_to_hex_str(_hash)
@@ -1021,6 +1021,9 @@ class HubDB:
                     ],
                     'pos': tx_pos
                 }
+                tx_infos[tx_hash_bytes[::-1].hex()] = None if not tx else tx.hex(), merkle
+                if tx_height > 0 and tx_height + 10 < self.db_height:
+                    self._tx_and_merkle_cache[tx_hash_bytes[::-1].hex()] = tx, merkle
                 await asyncio.sleep(0)
         if needed_mempool:
             for tx_hash_bytes, tx in zip(needed_mempool, await run_in_executor(
