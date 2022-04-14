@@ -1005,13 +1005,24 @@ class HubDB:
                 await asyncio.sleep(0)
 
         if needed_confirmed:
+            needed_heights = set()
+            tx_heights_and_positions = {}
             for (tx_hash_bytes, tx_num), tx in zip(needed_confirmed, await run_in_executor(
                     self._executor, self.prefix_db.tx.multi_get, [(tx_hash,) for tx_hash, _ in needed_confirmed],
                     True, False)):
                 tx_height = bisect_right(self.tx_counts, tx_num)
+                needed_heights.add(tx_height)
                 tx_pos = tx_num - self.tx_counts[tx_height - 1]
+                tx_heights_and_positions[tx_hash_bytes] = (tx, tx_num, tx_height, tx_pos)
+
+            sorted_heights = list(sorted(needed_heights))
+            block_txs = await run_in_executor(
+                self._executor, self.prefix_db.block_txs.multi_get, [(height,) for height in sorted_heights]
+            )
+            block_txs = {height: v.tx_hashes for height, v in zip(sorted_heights, block_txs)}
+            for tx_hash_bytes, (tx, tx_num, tx_height, tx_pos) in tx_heights_and_positions.items():
                 branch, root = self.merkle.branch_and_root(
-                    self.get_block_txs(tx_height), tx_pos
+                    block_txs[tx_height], tx_pos
                 )
                 merkle = {
                     'block_height': tx_height,
