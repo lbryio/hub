@@ -78,6 +78,7 @@ class HubDB:
 
         self.tx_counts = None
         self.headers = None
+        self.block_hashes = None
         self.encoded_headers = LRUCacheWithMetrics(1 << 21, metric_name='encoded_headers', namespace='wallet_server')
         self.last_flush = time.time()
 
@@ -775,6 +776,18 @@ class HubDB:
         assert len(headers) - 1 == self.db_height, f"{len(headers)} vs {self.db_height}"
         self.headers = headers
 
+    async def _read_block_hashes(self):
+        def get_block_hashes():
+            return [
+                block_hash for block_hash in self.prefix_db.block_hash.iterate(
+                    start=(0, ), stop=(self.db_height + 1, ), include_key=False, fill_cache=False, deserialize_value=False
+                )
+            ]
+
+        block_hashes = await asyncio.get_event_loop().run_in_executor(self._executor, get_block_hashes)
+        assert len(block_hashes) == len(self.headers)
+        self.block_hashes = block_hashes
+
     async def _read_tx_hashes(self):
         def _read_tx_hashes():
             return list(self.prefix_db.tx_hash.iterate(start=(0,), stop=(self.db_tx_count + 1,), include_key=False, fill_cache=False, deserialize_value=False))
@@ -839,6 +852,7 @@ class HubDB:
     async def initialize_caches(self):
         await self._read_tx_counts()
         await self._read_headers()
+        await self._read_block_hashes()
         if self._cache_all_claim_txos:
             await self._read_claim_txos()
         if self._cache_all_tx_hashes:

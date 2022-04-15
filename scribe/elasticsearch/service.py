@@ -231,7 +231,7 @@ class ElasticSyncService(BlockchainReaderService):
         self._advanced = True
 
     def unwind(self):
-        reverted_block_hash = self.db.coin.header_hash(self.db.headers[-1])
+        reverted_block_hash = self.db.block_hashes[-1]
         super().unwind()
         packed = self.db.prefix_db.undo.get(len(self.db.tx_counts), reverted_block_hash)
         touched_or_deleted = None
