@@ -90,12 +90,9 @@ class PrefixRow(metaclass=PrefixRowType):
 
     def multi_get(self, key_args: typing.List[typing.Tuple], fill_cache=True, deserialize_value=True):
         packed_keys = {tuple(args): self.pack_key(*args) for args in key_args}
-        result = {
-            k[-1]: v for k, v in (
-                self._db.multi_get([(self._column_family, packed_keys[tuple(args)]) for args in key_args],
-                                   fill_cache=fill_cache) or {}
-            ).items()
-        }
+        db_result = self._db.multi_get([(self._column_family, packed_keys[tuple(args)]) for args in key_args],
+                                   fill_cache=fill_cache)
+        result = {k[-1]: v for k, v in (db_result or {}).items()}
 
         def handle_value(v):
             return None if v is None else v if not deserialize_value else self.unpack_value(v)

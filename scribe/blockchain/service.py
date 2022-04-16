@@ -181,7 +181,7 @@ class BlockchainProcessorService(BlockchainService):
                         self.log.warning("failed to get a mempool tx, reorg underway?")
                         return
             if current_mempool:
-                if bytes.fromhex(await self.daemon.getbestblockhash())[::-1] != self.coin.header_hash(self.db.headers[-1]):
+                if bytes.fromhex(await self.daemon.getbestblockhash())[::-1] != self.db.block_hashes[-1]:
                     return
             await self.run_in_thread(
                 update_mempool, self.db.prefix_db.unsafe_commit, self.db.prefix_db.mempool_tx, _to_put, current_mempool
@@ -1417,6 +1417,7 @@ class BlockchainProcessorService(BlockchainService):
 
         self.height = height
         self.db.headers.append(block.header)
+        self.db.block_hashes.append(self.env.coin.header_hash(block.header))
         self.tip = self.coin.header_hash(block.header)
 
         self.db.fs_height = self.height
@@ -1493,8 +1494,9 @@ class BlockchainProcessorService(BlockchainService):
         # Check and update self.tip
 
         self.db.tx_counts.pop()
-        reverted_block_hash = self.coin.header_hash(self.db.headers.pop())
-        self.tip = self.coin.header_hash(self.db.headers[-1])
+        self.db.headers.pop()
+        reverted_block_hash = self.db.block_hashes.pop()
+        self.tip = self.db.block_hashes[-1]
         if self.env.cache_all_tx_hashes:
             while len(self.db.total_transactions) > self.db.tx_counts[-1]:
                 self.db.tx_num_mapping.pop(self.db.total_transactions.pop())

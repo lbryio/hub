@@ -157,7 +157,9 @@ class BlockchainReaderService(BlockchainService):
                 self.db.total_transactions.append(tx_hash)
                 self.db.tx_num_mapping[tx_hash] = tx_count
             assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
-        self.db.headers.append(self.db.prefix_db.header.get(height, deserialize_value=False))
+        header = self.db.prefix_db.header.get(height, deserialize_value=False)
+        self.db.headers.append(header)
+        self.db.block_hashes.append(self.env.coin.header_hash(header))
 
     def unwind(self):
         """
@@ -166,6 +168,7 @@ class BlockchainReaderService(BlockchainService):
         prev_count = self.db.tx_counts.pop()
         tx_count = self.db.tx_counts[-1]
         self.db.headers.pop()
+        self.db.block_hashes.pop()
         if self.db._cache_all_tx_hashes:
             for _ in range(prev_count - tx_count):
                 self.db.tx_num_mapping.pop(self.db.total_transactions.pop())

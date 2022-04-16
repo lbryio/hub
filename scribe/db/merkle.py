@@ -25,7 +25,7 @@
 # and warranty status of this software.
 
 """Merkle trees, branches, proofs and roots."""
-
+import typing
 from asyncio import Event
 from math import ceil, log
 
@@ -86,6 +86,26 @@ class Merkle:
                       for n in range(0, len(hashes), 2)]
 
         return branch, hashes[0]
+
+    @staticmethod
+    def branches_and_root(block_tx_hashes: typing.List[bytes], tx_positions: typing.List[int]):
+        block_tx_hashes = list(block_tx_hashes)
+        positions = list(tx_positions)
+        length = ceil(log(len(block_tx_hashes), 2))
+        branches = [[] for _ in range(len(tx_positions))]
+        for _ in range(length):
+            if len(block_tx_hashes) & 1:
+                h = block_tx_hashes[-1]
+                block_tx_hashes.append(h)
+            for idx, tx_position in enumerate(tx_positions):
+                h = block_tx_hashes[tx_position ^ 1]
+                branches[idx].append(h)
+                tx_positions[idx] >>= 1
+            block_tx_hashes = [
+                double_sha256(block_tx_hashes[n] + block_tx_hashes[n + 1]) for n in
+                range(0, len(block_tx_hashes), 2)
+            ]
+        return {tx_position: branch for tx_position, branch in zip(positions, branches)}, block_tx_hashes[0]
 
     @staticmethod
     def root(hashes, length=None):

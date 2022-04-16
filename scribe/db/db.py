@@ -78,6 +78,7 @@ class HubDB:
 
         self.tx_counts = None
         self.headers = None
+        self.block_hashes = None
         self.encoded_headers = LRUCacheWithMetrics(1 << 21, metric_name='encoded_headers', namespace='wallet_server')
         self.last_flush = time.time()
 
@@ -775,6 +776,18 @@ class HubDB:
         assert len(headers) - 1 == self.db_height, f"{len(headers)} vs {self.db_height}"
         self.headers = headers
 
+    async def _read_block_hashes(self):
+        def get_block_hashes():
+            return [
+                block_hash for block_hash in self.prefix_db.block_hash.iterate(
+                    start=(0, ), stop=(self.db_height + 1, ), include_key=False, fill_cache=False, deserialize_value=False
+                )
+            ]
+
+        block_hashes = await asyncio.get_event_loop().run_in_executor(self._executor, get_block_hashes)
+        assert len(block_hashes) == len(self.headers)
+        self.block_hashes = block_hashes
+
     async def _read_tx_hashes(self):
         def _read_tx_hashes():
             return list(self.prefix_db.tx_hash.iterate(start=(0,), stop=(self.db_tx_count + 1,), include_key=False, fill_cache=False, deserialize_value=False))
@@ -839,6 +852,7 @@ class HubDB:
     async def initialize_caches(self):
         await self._read_tx_counts()
         await self._read_headers()
+        await self._read_block_hashes()
         if self._cache_all_claim_txos:
             await self._read_claim_txos()
         if self._cache_all_tx_hashes:
@@ -976,51 +990,74 @@ class HubDB:
 
     async def get_transactions_and_merkles(self, tx_hashes: Iterable[str]):
         tx_infos = {}
-        for tx_hash in tx_hashes:
-            tx_infos[tx_hash] = await asyncio.get_event_loop().run_in_executor(
-                self._executor, self._get_transaction_and_merkle, tx_hash
-            )
-            await asyncio.sleep(0)
-        return tx_infos
+        needed = []
+        needed_confirmed = []
+        needed_mempool = []
+        run_in_executor = asyncio.get_event_loop().run_in_executor
 
-    def _get_transaction_and_merkle(self, tx_hash):
-        cached_tx = self._tx_and_merkle_cache.get(tx_hash)
-        if cached_tx:
-            tx, merkle = cached_tx
-        else:
-            tx_hash_bytes = bytes.fromhex(tx_hash)[::-1]
-            tx_num = self.prefix_db.tx_num.get(tx_hash_bytes)
-            tx = None
-            tx_height = -1
-            tx_num = None if not tx_num else tx_num.tx_num
-            if tx_num is not None:
-                if self._cache_all_claim_txos:
-                    fill_cache = tx_num in self.txo_to_claim and len(self.txo_to_claim[tx_num]) > 0
-                else:
-                    fill_cache = True
-                tx_height = bisect_right(self.tx_counts, tx_num)
-                tx = self.prefix_db.tx.get(tx_hash_bytes, fill_cache=fill_cache, deserialize_value=False)
-            if tx_height == -1:
-                merkle = {
-                    'block_height': -1
-                }
-                tx = self.prefix_db.mempool_tx.get(tx_hash_bytes, deserialize_value=False)
+        for tx_hash in tx_hashes:
+            cached_tx = self._tx_and_merkle_cache.get(tx_hash)
+            if cached_tx:
+                tx, merkle = cached_tx
+                tx_infos[tx_hash] = None if not tx else tx.hex(), merkle
             else:
+                tx_hash_bytes = bytes.fromhex(tx_hash)[::-1]
+                if self._cache_all_tx_hashes and tx_hash_bytes in self.tx_num_mapping:
+                    needed_confirmed.append((tx_hash_bytes, self.tx_num_mapping[tx_hash_bytes]))
+                else:
+                    needed.append(tx_hash_bytes)
+
+        if needed:
+            for tx_hash_bytes, v in zip(needed, await run_in_executor(
+                    self._executor, self.prefix_db.tx_num.multi_get, [(tx_hash,) for tx_hash in needed],
+                    True, True)):
+                tx_num = None if v is None else v.tx_num
+                if tx_num is not None:
+                    needed_confirmed.append((tx_hash_bytes, tx_num))
+                else:
+                    needed_mempool.append(tx_hash_bytes)
+                await asyncio.sleep(0)
+
+        if needed_confirmed:
+            needed_heights = set()
+            tx_heights_and_positions = defaultdict(list)
+            for (tx_hash_bytes, tx_num), tx in zip(needed_confirmed, await run_in_executor(
+                    self._executor, self.prefix_db.tx.multi_get, [(tx_hash,) for tx_hash, _ in needed_confirmed],
+                    True, False)):
+                tx_height = bisect_right(self.tx_counts, tx_num)
+                needed_heights.add(tx_height)
                 tx_pos = tx_num - self.tx_counts[tx_height - 1]
-                branch, root = self.merkle.branch_and_root(
-                    self.get_block_txs(tx_height), tx_pos
+                tx_heights_and_positions[tx_height].append((tx_hash_bytes, tx, tx_num, tx_pos))
+
+            sorted_heights = list(sorted(needed_heights))
+            block_txs = await run_in_executor(
+                self._executor, self.prefix_db.block_txs.multi_get, [(height,) for height in sorted_heights]
+            )
+            block_txs = {height: v.tx_hashes for height, v in zip(sorted_heights, block_txs)}
+            for tx_height, v in tx_heights_and_positions.items():
+                branches, root = self.merkle.branches_and_root(
+                    block_txs[tx_height], [tx_pos for (tx_hash_bytes, tx, tx_num, tx_pos) in v]
                 )
-                merkle = {
-                    'block_height': tx_height,
-                    'merkle': [
-                        hash_to_hex_str(_hash)
-                        for _hash in branch
-                    ],
-                    'pos': tx_pos
-                }
-            if tx_height > 0 and tx_height + 10 < self.db_height:
-                self._tx_and_merkle_cache[tx_hash] = tx, merkle
-        return None if not tx else tx.hex(), merkle
+                for (tx_hash_bytes, tx, tx_num, tx_pos) in v:
+                    merkle = {
+                        'block_height': tx_height,
+                        'merkle': [
+                            hash_to_hex_str(_hash)
+                            for _hash in branches[tx_pos]
+                        ],
+                        'pos': tx_pos
+                    }
+                    tx_infos[tx_hash_bytes[::-1].hex()] = None if not tx else tx.hex(), merkle
+                    if tx_height > 0 and tx_height + 10 < self.db_height:
+                        self._tx_and_merkle_cache[tx_hash_bytes[::-1].hex()] = tx, merkle
+                await asyncio.sleep(0)
+        if needed_mempool:
+            for tx_hash_bytes, tx in zip(needed_mempool, await run_in_executor(
+                    self._executor, self.prefix_db.mempool_tx.multi_get, [(tx_hash,) for tx_hash in needed_mempool],
+                    True, False)):
+                tx_infos[tx_hash_bytes[::-1].hex()] = None if not tx else tx.hex(), {'block_height': -1}
+                await asyncio.sleep(0)
+        return tx_infos
 
     async def fs_block_hashes(self, height, count):
         if height + count > len(self.headers):
