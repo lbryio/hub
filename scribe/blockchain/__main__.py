@@ -11,7 +11,8 @@ def main():
     parser = argparse.ArgumentParser(
         prog='scribe'
     )
-    Env.contribute_to_arg_parser(parser)
+    Env.contribute_common_settings_to_arg_parser(parser)
+    Env.contribute_writer_settings_to_arg_parser(parser)
     args = parser.parse_args()
 
     try:

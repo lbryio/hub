@@ -1694,7 +1694,7 @@ class HashXMempoolStatusPrefixRow(PrefixRow):
 
 
 class PrefixDB(BasePrefixDB):
-    def __init__(self, path: str, cache_mb: int = 128, reorg_limit: int = 200, max_open_files: int = 64,
+    def __init__(self, path: str, reorg_limit: int = 200, max_open_files: int = 64,
                  secondary_path: str = '', unsafe_prefixes: Optional[typing.Set[bytes]] = None):
         super().__init__(path, max_open_files=max_open_files, secondary_path=secondary_path,
                          max_undo_depth=reorg_limit, unsafe_prefixes=unsafe_prefixes)

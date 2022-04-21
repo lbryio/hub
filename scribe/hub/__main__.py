@@ -11,7 +11,8 @@ def main():
     parser = argparse.ArgumentParser(
         prog='scribe-hub'
     )
-    Env.contribute_to_arg_parser(parser)
+    Env.contribute_common_settings_to_arg_parser(parser)
+    Env.contribute_server_settings_to_arg_parser(parser)
     args = parser.parse_args()
 
     try:

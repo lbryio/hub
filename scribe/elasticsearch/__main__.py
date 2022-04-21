@@ -11,8 +11,8 @@ def main():
     parser = argparse.ArgumentParser(
         prog='scribe-elastic-sync'
     )
-    Env.contribute_to_arg_parser(parser)
-    parser.add_argument('--reindex', type=bool, default=False)
+    Env.contribute_common_settings_to_arg_parser(parser)
+    Env.contribute_elastic_sync_settings_to_arg_parser(parser)
     args = parser.parse_args()
 
     try:
