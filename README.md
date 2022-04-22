@@ -49,21 +49,62 @@ source scribe-venv/bin/activate
 pip install -e .
 ```
 
+That completes the installation, now you should have the commands `scribe`, `scribe-elastic-sync` and `scribe-hub`
+
+These can also optionally be run with `python -m scribe.blockchain`, `python -m scribe.elasticsearch`, and `python -m scribe.hub`
+
 ## Usage
 
-Scribe needs either the [lbrycrd](https://github.com/lbryio/lbrycrd) or [lbcd](https://github.com/lbryio/lbcd) blockchain daemon to be running.
+### Requirements
 
-As of block 1124663 (3/10/22) the size of the rocksdb database is 87GB and the size of the elasticsearch volume is 49GB.
+Scribe needs elasticsearch and either the [lbrycrd](https://github.com/lbryio/lbrycrd) or [lbcd](https://github.com/lbryio/lbcd) blockchain daemon to be running.
+
+With options for high performance, if you have 64gb of memory and 12 cores, everything can be run on the same machine. However, the recommended way is with elasticsearch on one instance with 8gb of memory and at least 4 cores dedicated to it and the blockchain daemon on another with 16gb of memory and at least 4 cores. Then the scribe hub services can be run their own instance with between 16 and 32gb of memory (depending on settings) and 8 cores. 
+
+As of block 1147423 (4/21/22) the size of the scribe rocksdb database is 120GB and the size of the elasticsearch volume is 63GB.
 
 ### docker-compose
 
+The recommended way to run a scribe hub is with docker.
+
+#### Cluster environment
+
+[Example docker-compose.yml](https://github.com/lbryio/scribe/blob/master/docker/elastic-compose.yml) for the elasticsearch instance
+
+[Example docker-compose.yml](https://github.com/lbryio/scribe/blob/master/docker/hub-compose.yml)  for the hub instance
+
+
 ### From source
 
-To start scribe, run the following (providing your own args)
+### Options
 
-```
-scribe --db_dir /your/db/path --daemon_url rpcuser:rpcpass@localhost:9245
-```
+#### Common options across `scribe`, `scribe-hub`, and `scribe-elastic-sync`:
+  - `--db_dir` (required) Path of the directory containing lbry-rocksdb, set from the environment with `DB_DIRECTORY`
+  - `--daemon_url` (required for `scribe` and `scribe-hub`) URL for rpc from lbrycrd or lbcd<rpcuser>:<rpcpassword>@<lbrycrd rpc ip><lbrycrd rpc port>.
+  - `--reorg_limit` Max reorg depth, defaults to 200, set from the environment with `REORG_LIMIT`.
+  - `--chain` With blockchain to use - either `mainnet`, `testnet`, or `regtest` - set from the environment with `NET`
+  - `--max_query_workers` Size of the thread pool, set from the environment with `MAX_QUERY_WORKERS`
+  - `--cache_all_tx_hashes` If this flag is set, all tx hashes will be stored in memory. For `scribe`, this speeds up the rate it can apply blocks as well as process mempool. For `scribe-hub`, this will speed up syncing address histories. This setting will use 10+g of memory. It can be set from the environment with `CACHE_ALL_TX_HASHES=Yes`
+  - `--cache_all_claim_txos` If this flag is set, all claim txos will be indexed in memory. Set from the environment with `CACHE_ALL_CLAIM_TXOS=Yes`
+  - `--prometheus_port` If provided this port will be used to provide prometheus metrics, set from the environment with `PROMETHEUS_PORT`
+
+#### Options for `scribe`
+  - `--db_max_open_files` This setting translates into the max_open_files option given to rocksdb. A higher number will use more memory. Defaults to 64.
+
+#### Options for `scribe-elastic-sync`
+  - `--reindex` If this flag is set drop and rebuild the elasticsearch index.
+
+#### Options for `scribe-hub`
+  - `--host` Interface for server to listen on, use 0.0.0.0 to listen on the external interface. Can be set from the environment with `HOST`
+  - `--tcp_port` Electrum TCP port to listen on for hub server. Can be set from the environment with `TCP_PORT`
+  - `--udp_port` UDP port to listen on for hub server. Can be set from the environment with `UDP_PORT`
+  - `--elastic_host` Hostname or ip address of the elasticsearch instance to connect to. Can be set from the environment with `ELASTIC_HOST`
+  - `--elastic_port` Elasticsearch port to connect to. Can be set from the environment with `ELASTIC_PORT`
+  - `--elastic_notifier_host` Elastic sync notifier host to connect to, defaults to localhost. Can be set from the environment with `ELASTIC_NOTIFIER_HOST`
+  - `--elastic_notifier_port` Elastic sync notifier port to connect using. Can be set from the environment with `ELASTIC_NOTIFIER_PORT`
+  - `--query_timeout_ms` Timeout for claim searches in elasticsearch in milliseconds. Can be set from the environment with `QUERY_TIMEOUT_MS`
+  - `--blocking_channel_ids` Space separated list of channel claim ids used for blocking. Claims that are reposted by these channels can't be resolved or returned in search results. Can be set from the environment with `BLOCKING_CHANNEL_IDS`.
+  - `--filtering_channel_ids` Space separated list of channel claim ids used for blocking. Claims that are reposted by these channels aren't returned in search results. Can be set from the environment with `FILTERING_CHANNEL_IDS`
 
 ## Contributing
 
