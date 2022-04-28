@@ -279,10 +279,9 @@ class MerkleCache:
 
 
 class FastMerkleCacheItem:
-    __slots__ = ['tx_hashes', 'tree', 'root_hash']
+    __slots__ = ['tree', 'root_hash']
 
     def __init__(self, tx_hashes: typing.List[bytes]):
-        self.tx_hashes = tuple(tx_hashes)
         self.tree: typing.List[typing.List[bytes]] = []
         self.root_hash = self._walk_merkle(tx_hashes, self.tree.append)
 
