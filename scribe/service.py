@@ -151,12 +151,20 @@ class BlockchainReaderService(BlockchainService):
         assert len(self.db.tx_counts) == height, f"{len(self.db.tx_counts)} != {height}"
         prev_count = self.db.tx_counts[-1]
         self.db.tx_counts.append(tx_count)
-        if self.db._cache_all_tx_hashes:
-            for tx_num in range(prev_count, tx_count):
-                tx_hash = self.db.prefix_db.tx_hash.get(tx_num).tx_hash
+
+        # precache all of the txs from this block
+        block_tx_hashes = self.db.prefix_db.block_txs.get(height).tx_hashes
+        block_txs = self.db.prefix_db.tx.multi_get(
+            [(tx_hash,) for tx_hash in block_tx_hashes], deserialize_value=False
+        )
+        for tx_pos, (tx_num, tx_hash, tx) in enumerate(zip(range(prev_count, tx_count), block_tx_hashes, block_txs)):
+            self.db.tx_cache[tx_hash] = tx, tx_num, tx_pos, height
+            if self.db._cache_all_tx_hashes:
                 self.db.total_transactions.append(tx_hash)
                 self.db.tx_num_mapping[tx_hash] = tx_count
+        if self.db._cache_all_tx_hashes:
             assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
+
         header = self.db.prefix_db.header.get(height, deserialize_value=False)
         self.db.headers.append(header)
         self.db.block_hashes.append(self.env.coin.header_hash(header))
@@ -171,8 +179,11 @@ class BlockchainReaderService(BlockchainService):
         self.db.block_hashes.pop()
         if self.db._cache_all_tx_hashes:
             for _ in range(prev_count - tx_count):
-                self.db.tx_num_mapping.pop(self.db.total_transactions.pop())
+                tx_hash = self.db.tx_num_mapping.pop(self.db.total_transactions.pop())
+                if tx_hash in self.db.tx_cache:
+                    self.db.tx_cache.pop(tx_hash)
             assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
+        self.db.merkle_cache.clear()
 
     def _detect_changes(self):
         try:
