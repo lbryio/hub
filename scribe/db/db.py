@@ -18,7 +18,7 @@ from scribe.schema.claim import guess_stream_type
 from scribe.schema.result import Censor
 from scribe.blockchain.transaction import TxInput
 from scribe.common import hash_to_hex_str, hash160, LRUCacheWithMetrics
-from scribe.db.merkle import Merkle, MerkleCache
+from scribe.db.merkle import Merkle, MerkleCache, FastMerkleCacheItem
 from scribe.db.common import ResolveResult, STREAM_TYPES, CLAIM_TYPES, ExpandedResolveResult, DBError, UTXO
 from scribe.db.prefixes import PendingActivationValue, ClaimTakeoverValue, ClaimToTXOValue, PrefixDB
 from scribe.db.prefixes import ACTIVATED_CLAIM_TXO_TYPE, ACTIVATED_SUPPORT_TXO_TYPE, EffectiveAmountKey
