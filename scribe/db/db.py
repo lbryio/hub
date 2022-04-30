@@ -91,7 +91,7 @@ class HubDB:
         # lru cache of tx_hash: (tx_bytes, tx_num, position, tx_height)
         self.tx_cache = LRUCacheWithMetrics(2 ** 14, metric_name='tx', namespace=NAMESPACE)
         # lru cache of block heights to merkle trees of the block tx hashes
-        self.merkle_cache = LRUCacheWithMetrics(2 ** 15, metric_name='merkle', namespace=NAMESPACE)
+        self.merkle_cache = LRUCacheWithMetrics(2 ** 13, metric_name='merkle', namespace=NAMESPACE)
 
         # these are only used if the cache_all_tx_hashes setting is on
         self.total_transactions: List[bytes] = []
@@ -100,9 +100,7 @@ class HubDB:
         # these are only used if the cache_all_claim_txos setting is on
         self.claim_to_txo: Dict[bytes, ClaimToTXOValue] = {}
         self.txo_to_claim: DefaultDict[int, Dict[int, bytes]] = defaultdict(dict)
-
         self.genesis_bytes = bytes.fromhex(self.coin.GENESIS_HASH)
-
 
     def get_claim_from_txo(self, tx_num: int, tx_idx: int) -> Optional[TXOToClaimValue]:
         claim_hash_and_name = self.prefix_db.txo_to_claim.get(tx_num, tx_idx)
