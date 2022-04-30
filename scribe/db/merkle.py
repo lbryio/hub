@@ -276,3 +276,29 @@ class MerkleCache:
         level = await self._level_for(length)
         return self.merkle.branch_and_root_from_level(
             level, leaf_hashes, index, self.depth_higher)
+
+
+class FastMerkleCacheItem:
+    __slots__ = ['tree', 'root_hash']
+
+    def __init__(self, tx_hashes: typing.List[bytes]):
+        self.tree: typing.List[typing.List[bytes]] = []
+        self.root_hash = self._walk_merkle(tx_hashes, self.tree.append)
+
+    @staticmethod
+    def _walk_merkle(items: typing.List[bytes], append_layer) -> bytes:
+        if len(items) == 1:
+            return items[0]
+        append_layer(items)
+        layer = [
+            double_sha256(items[index] + items[index])
+            if index + 1 == len(items) else double_sha256(items[index] + items[index + 1])
+            for index in range(0, len(items), 2)
+        ]
+        return FastMerkleCacheItem._walk_merkle(layer, append_layer)
+
+    def branch(self, tx_position: int) -> typing.List[str]:
+        return [
+            (layer[-1] if (tx_position >> shift) ^ 1 == len(layer) else layer[(tx_position >> shift) ^ 1])[::-1].hex()
+            for shift, layer in enumerate(self.tree)
+        ]
