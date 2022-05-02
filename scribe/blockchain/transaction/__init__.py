@@ -4,6 +4,7 @@ import typing
 from dataclasses import dataclass
 from struct import Struct
 from scribe.schema.claim import Claim
+from scribe.common import double_sha256
 
 if (sys.version_info.major, sys.version_info.minor) > (3, 7):
     cachedproperty = functools.cached_property
@@ -83,6 +84,51 @@ class Tx(typing.NamedTuple):
     marker: typing.Optional[int] = None
     flag: typing.Optional[int] = None
     witness: typing.Optional[typing.List[typing.List[bytes]]] = None
+
+    def as_dict(self, coin):
+        txid = double_sha256(self.raw)[::-1].hex()
+        result = {
+          "txid": txid,
+          "hash": txid,
+          "version": self.version,
+          "size": len(self.raw),
+          "vsize": len(self.raw),
+          "weight": None,
+          "locktime": self.locktime,
+          "vin": [
+              {
+                  "txid": txin.prev_hash[::-1].hex(),
+                  "vout": txin.prev_idx,
+                  "scriptSig": {
+                      "asm": None,
+                      "hex": txin.script.hex()
+                  },
+                  "sequence": txin.sequence
+              } for txin in self.inputs
+          ],
+          "vout": [
+              {
+                  "value": txo.value / 1E8,
+                  "n": txo.nout,
+                  "scriptPubKey": {
+                      "asm": None,
+                      "hex": txo.pk_script.hex(),
+                      "reqSigs": 1,
+                      "type": "nonstandard" if (txo.is_support or txo.is_claim or txo.is_update) else "pubkeyhash" if txo.pubkey_hash else "scripthash",
+                      "addresses": [
+                          coin.claim_address_handler(txo)
+                      ]
+                  }
+              } for txo in self.outputs
+          ],
+          "hex": self.raw.hex()
+        }
+        for n, txo in enumerate(self.outputs):
+            if txo.is_support or txo.is_claim or txo.is_update:
+                result['vout'][n]["scriptPubKey"]["isclaim"] = txo.is_claim or txo.is_update
+                result['vout'][n]["scriptPubKey"]["issupport"] = txo.is_support
+                result['vout'][n]["scriptPubKey"]["subtype"] = "pubkeyhash" if txo.pubkey_hash else "scripthash"
+        return result
 
 
 class TxInput(typing.NamedTuple):
