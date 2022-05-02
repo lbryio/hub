@@ -1668,13 +1668,14 @@ class LBRYElectrumX(asyncio.Protocol):
         verbose: passed on to the daemon
         """
         assert_tx_hash(txid)
-        if verbose not in (True, False):
-            raise RPCError(BAD_REQUEST, f'"verbose" must be a boolean')
+        verbose = bool(verbose)
         tx_hash_bytes = bytes.fromhex(txid)[::-1]
 
         raw_tx = await asyncio.get_event_loop().run_in_executor(None, self.db.get_raw_tx, tx_hash_bytes)
         if raw_tx:
-            return raw_tx.hex()
+            if not verbose:
+                return raw_tx.hex()
+            return self.coin.transaction(raw_tx).as_dict(self.coin)
         return RPCError("No such mempool or blockchain transaction.")
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
