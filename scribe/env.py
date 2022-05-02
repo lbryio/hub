@@ -284,7 +284,10 @@ class Env:
             return self.PD_ON
 
     def extract_peer_hubs(self):
-        return [hub.strip() for hub in self.default('PEER_HUBS', '').split(',')]
+        peer_hubs = self.default('PEER_HUBS', '')
+        if not peer_hubs:
+            return []
+        return [hub.strip() for hub in peer_hubs.split(',')]
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
