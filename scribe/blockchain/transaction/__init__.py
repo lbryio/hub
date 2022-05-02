@@ -93,14 +93,14 @@ class Tx(typing.NamedTuple):
           "version": self.version,
           "size": len(self.raw),
           "vsize": len(self.raw),
-          "weight": None,
+          "weight": None,  # FIXME: add this
           "locktime": self.locktime,
           "vin": [
               {
                   "txid": txin.prev_hash[::-1].hex(),
                   "vout": txin.prev_idx,
                   "scriptSig": {
-                      "asm": None,
+                      "asm": None,  # FIXME: add this
                       "hex": txin.script.hex()
                   },
                   "sequence": txin.sequence
@@ -111,9 +111,9 @@ class Tx(typing.NamedTuple):
                   "value": txo.value / 1E8,
                   "n": txo.nout,
                   "scriptPubKey": {
-                      "asm": None,
+                      "asm": None,  # FIXME: add this
                       "hex": txo.pk_script.hex(),
-                      "reqSigs": 1,
+                      "reqSigs": 1,  # FIXME: what if it isn't 1?
                       "type": "nonstandard" if (txo.is_support or txo.is_claim or txo.is_update) else "pubkeyhash" if txo.pubkey_hash else "scripthash",
                       "addresses": [
                           coin.claim_address_handler(txo)
