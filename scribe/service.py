@@ -186,6 +186,9 @@ class BlockchainReaderService(BlockchainService):
             assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
         self.db.merkle_cache.clear()
 
+    def _reorg_detected(self):
+        pass
+
     def _detect_changes(self):
         try:
             self.db.prefix_db.try_catch_up_with_primary()
@@ -196,6 +199,7 @@ class BlockchainReaderService(BlockchainService):
         if not state or state.height <= 0:
             return
         if self.last_state and self.last_state.height > state.height:
+            self._reorg_detected()
             self.log.warning("reorg detected, waiting until the writer has flushed the new blocks to advance")
             return
         last_height = 0 if not self.last_state else self.last_state.height

@@ -165,7 +165,7 @@ class SessionManager:
     )
 
     def __init__(self, env: 'ServerEnv', db: 'HubDB', mempool: 'HubMemPool',
-                 daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
+                 daemon: 'LBCDaemon', large_history_cache, shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
         self.env = env
@@ -184,6 +184,7 @@ class SessionManager:
         self.txs_sent = 0
         self.start_time = time.time()
         self.history_cache = {}
+        self.largest_history_cache = large_history_cache
         self.resolve_outputs_cache = {}
         self.resolve_cache = {}
         self.notified_height: typing.Optional[int] = None
@@ -594,6 +595,8 @@ class SessionManager:
 
     async def limited_history(self, hashX):
         """A caching layer."""
+        if hashX in self.largest_history_cache:
+            return self.largest_history_cache[hashX]
         if hashX not in self.history_cache:
             # History DoS limit.  Each element of history is about 99
             # bytes when encoded as JSON.  This limits resource usage

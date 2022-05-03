@@ -5,6 +5,7 @@ import logging
 import logging.handlers
 import typing
 import collections
+from bisect import bisect_right
 from asyncio import get_event_loop, Event
 from prometheus_client import Counter
 
@@ -251,6 +252,78 @@ class LRUCache:
 
     def __del__(self):
         self.clear()
+
+
+class LargestValueCache:
+    __slots__ = [
+        '_capacity',
+        '_cache',
+        '_sizes',
+        '_keys'
+    ]
+
+    def __init__(self, capacity: int):
+        self._capacity = capacity
+        self._cache = {}
+        self._keys = []
+        self._sizes = []
+
+    def items(self):
+        return self._cache.items()
+
+    def get(self, key, default=None):
+        return self._cache.get(key, default)
+
+    @property
+    def full(self):
+        return len(self._cache) >= self._capacity
+
+    def set(self, key, value) -> bool:
+        if not self.full:
+            idx = len(self._sizes) - bisect_right(list(reversed(self._sizes)), len(value))
+            self._sizes.insert(idx, len(value))
+            self._keys.insert(idx, key)
+            self._cache[key] = value
+            return True
+        elif key in self._cache:  # item is already cached, update it
+            existing = self._keys.index(key)
+            if len(value) != self._sizes[existing]:
+                self._keys.pop(existing)
+                self._sizes.pop(existing)
+                idx = len(self._sizes) - bisect_right(list(reversed(self._sizes)), len(value))
+                self._sizes.insert(idx, len(value))
+                self._keys.insert(idx, key)
+            self._cache[key] = value
+            return True
+        elif len(value) > self._sizes[-1]:
+            self._sizes.pop()
+            self._cache.pop(self._keys.pop())
+            idx = len(self._sizes) - bisect_right(list(reversed(self._sizes)), len(value))
+            self._sizes.insert(idx, len(value))
+            self._keys.insert(idx, key)
+            self._cache[key] = value
+            return True
+        return False
+
+    def clear(self):
+        self._cache.clear()
+        self._sizes.clear()
+        self._keys.clear()
+
+    def pop(self, key, default=None):
+        return self._cache.pop(key, default)
+
+    def __setitem__(self, key, value):
+        return self.set(key, value)
+
+    def __getitem__(self, item):
+        return self.get(item)
+
+    def __contains__(self, item) -> bool:
+        return item in self._cache
+
+    def __len__(self):
+        return len(self._cache)
 
 
 # the ipaddress module does not show these subnets as reserved

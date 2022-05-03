@@ -1,12 +1,14 @@
 import time
 import typing
 import asyncio
+from bisect import bisect_right
 from scribe.blockchain.daemon import LBCDaemon
 from scribe.hub.session import SessionManager
 from scribe.hub.mempool import HubMemPool
 from scribe.hub.udp import StatusServer
 from scribe.service import BlockchainReaderService
 from scribe.elasticsearch import ElasticNotifierClientProtocol
+from scribe.common import LargestValueCache
 if typing.TYPE_CHECKING:
     from scribe.hub.env import ServerEnv
 
@@ -20,8 +22,10 @@ class HubServerService(BlockchainReaderService):
         self.status_server = StatusServer()
         self.daemon = LBCDaemon(env.coin, env.daemon_url)  # only needed for broadcasting txs
         self.mempool = HubMemPool(self.env.coin, self.db)
+        self.large_history_cache = LargestValueCache(10000)  # stores histories as lists of tx nums
+        self.large_full_history_cache = LargestValueCache(10000)  # stores serialized histories
         self.session_manager = SessionManager(
-            env, self.db, self.mempool, self.daemon,
+            env, self.db, self.mempool, self.daemon, self.large_full_history_cache,
             self.shutdown_event,
             on_available_callback=self.status_server.set_available,
             on_unavailable_callback=self.status_server.set_unavailable
@@ -43,9 +47,36 @@ class HubServerService(BlockchainReaderService):
     def clear_search_cache(self):
         self.session_manager.search_index.clear_caches()
 
+    def _reorg_detected(self):
+        self.large_history_cache.clear()  # TODO: these could be pruned instead of cleared
+        self.large_full_history_cache.clear()
+
     def advance(self, height: int):
         super().advance(height)
         touched_hashXs = self.db.prefix_db.touched_hashX.get(height).touched_hashXs
+
+        # update cached address histories
+        for hashX in touched_hashXs:
+            history = self.large_history_cache.get(hashX) or []
+            extend_history = history.extend
+            full_history = self.large_full_history_cache.get(hashX) or []
+            start_height = 0
+            if full_history:
+                start_height = full_history[-1][1] + 1
+            for hist in self.db.prefix_db.hashX_history.iterate(start=(hashX, start_height),
+                                                                stop=(hashX, height + 1), include_key=False):
+                extend_history(hist)
+            if not history:
+                continue
+            if self.large_history_cache.set(hashX, list(history)):  # only the largest will be cached:
+                precached_offset = len(full_history or [])
+                needed_history = history[precached_offset:]
+                if needed_history:
+                    append_full_history = full_history.append
+                    for tx_num, tx_hash in zip(needed_history, self.db.get_tx_hashes(needed_history)):
+                        append_full_history((tx_hash, bisect_right(self.db.tx_counts, tx_num)))
+                    self.large_full_history_cache.set(hashX, full_history)
+
         self.notifications_to_send.append((set(touched_hashXs), height))
 
     def _detect_changes(self):
@@ -94,7 +125,23 @@ class HubServerService(BlockchainReaderService):
                 self.env.host, self.env.udp_port, self.env.allow_lan_udp
             )
 
+    def populate_largest_histories_cache(self):
+        self.log.info("populating address history cache")
+        for hashX, history in self.db.prefix_db.hashX_history.iterate():
+            self.large_history_cache[hashX] = history
+        self.log.info("sorted %i largest address histories", len(self.large_history_cache))
+        for hashX, history in self.large_history_cache.items():
+            full_history = []
+            append_full_history = full_history.append
+            for tx_num, tx_hash in zip(history, self.db.get_tx_hashes(history)):
+                append_full_history((tx_hash, bisect_right(self.db.tx_counts, tx_num)))
+            self.large_full_history_cache.set(hashX, full_history)
+        self.log.info("cached %i largest address histories ranging from %i to %i txs in length",
+                      len(self.large_history_cache), self.large_history_cache._sizes[-1],
+                      self.large_history_cache._sizes[0])
+
     def _iter_start_tasks(self):
+        # self.populate_largest_histories_cache()
         yield self.start_status_server()
         yield self.start_cancellable(self.es_notification_client.maintain_connection)
         yield self.start_cancellable(self.mempool.send_notifications_forever)
