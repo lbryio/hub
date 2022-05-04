@@ -7,6 +7,7 @@ volumes:
 services:
   scribe:
     depends_on:
+      - lbcd
       - scribe_elastic_sync
     image: lbry/scribe:${SCRIBE_TAG:-latest-release}
     restart: always
@@ -39,6 +40,7 @@ services:
       #- ELASTIC_NOTIFIER_PORT=19080
   scribe_hub:
     depends_on:
+      - lbcd
       - scribe_elastic_sync
       - scribe
     image: lbry/scribe:${SCRIBE_TAG:-latest-release}
@@ -80,3 +82,17 @@ services:
       - "es01:/usr/share/elasticsearch/data"
     ports:
       - "127.0.0.1:9200:9200"
+  lbcd:
+    image: lbry/lbcd:latest
+    restart: always
+    network_mode: host
+    command:
+      - "--notls"
+      - "--listen=0.0.0.0:9246"
+      - "--rpclisten=127.0.0.1:9245"
+      - "--rpcuser=lbry"
+      - "--rpcpass=lbry"
+    volumes:
+      - "lbcd:/root/.lbcd"
+    ports:
+      - "9246:9246"   # p2p
