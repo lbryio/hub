@@ -16,5 +16,4 @@ docker save $IMAGE | ssh $TARGET_HOST docker load
 ssh $TARGET_HOST docker tag $IMAGE lbry/scribe:development
 
 ## restart the wallet server
-ssh $TARGET_HOST docker-compose down
 ssh $TARGET_HOST SCRIBE_TAG="development" docker-compose up -d
