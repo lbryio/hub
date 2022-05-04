@@ -7,38 +7,38 @@ services:
   scribe:
     depends_on:
       - scribe_elastic_sync
-    image: lbry/scribe:${SCRIBE_TAG:-latest-release}
+    image: lbry/scribe:${SCRIBE_TAG:-development}
     restart: always
     network_mode: host
     volumes:
       - "lbry_rocksdb:/database"
-    environment:  # for full options, see `scribe --help`
+    environment:
       - HUB_COMMAND=scribe
-      - DAEMON_URL=http://lbry:lbry@127.0.0.1:9245
-      - MAX_QUERY_WORKERS=2
-      #- CACHE_ALL_TX_HASHES=Yes          # uncomment to keep an index of all tx hashes in memory. This uses lots (10+g) of memory but substantially improves performance.
+    command:
+      - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
+      - "--max_query_workers=2"
+      - "--cache_all_tx_hashes"
   scribe_elastic_sync:
-    image: lbry/scribe:${SCRIBE_TAG:-latest-release}
+    image: lbry/scribe:${SCRIBE_TAG:-development}
     restart: always
     network_mode: host
     ports:
       - "127.0.0.1:19080:19080"  # elastic notifier port
     volumes:
       - "lbry_rocksdb:/database"
-    environment:  # for full options, see `scribe-elastic-sync --help`
+    environment:
       - HUB_COMMAND=scribe-elastic-sync
-      - MAX_QUERY_WORKERS=2
-      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
-      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
-      #- ELASTIC_HOST=127.0.0.1           # elasticsearch host
-      #- ELASTIC_PORT=9200                # elasticsearch port
-      #- ELASTIC_NOTIFIER_HOST=127.0.0.1  # address for the elastic sync notifier to connect to
-      #- ELASTIC_NOTIFIER_PORT=19080
+    command:
+      - "--elastic_host=127.0.0.1"
+      - "--elastic_port=9200"
+      - "--max_query_workers=2"
+      - "--filtering_channel_ids=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8"
+      - "--blocking_channel_ids=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6"
   scribe_hub:
     depends_on:
       - scribe_elastic_sync
       - scribe
-    image: lbry/scribe:${SCRIBE_TAG:-latest-release}
+    image: lbry/scribe:${SCRIBE_TAG:-development}
     restart: always
     network_mode: host
     ports:
@@ -46,17 +46,15 @@ services:
       - "2112:2112"   # comment out to disable prometheus metrics
     volumes:
       - "lbry_rocksdb:/database"
-    environment:  # for full options, see `scribe-hub --help`
+    environment:
       - HUB_COMMAND=scribe-hub
-      - DAEMON_URL=http://lbry:lbry@127.0.0.1:9245  # used for broadcasting transactions
-      - HOST=0.0.0.0
-      - MAX_QUERY_WORKERS=4              # reader threads
-      - PROMETHEUS_PORT=2112             # comment out to disable prometheus metrics
-      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
-      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
-      #- MAX_SESSIONS=100000              # uncomment to increase the maximum number of electrum connections, defaults to 1000
-      #- ALLOW_LAN_UDP=Yes                # uncomment to reply to clients on the local network
-      #- ELASTIC_HOST=127.0.0.1           # elasticsearch host
-      #- ELASTIC_PORT=9200                # elasticsearch port
-      #- ELASTIC_NOTIFIER_HOST=127.0.0.1  # address for the elastic sync notifier to connect to
-      #- ELASTIC_NOTIFIER_PORT=19080
+    command:
+      - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
+      - "--elastic_host=127.0.0.1"
+      - "--elastic_port=9200"
+      - "--max_query_workers=4"
+      - "--host=0.0.0.0"
+      - "--max_sessions=100000"
+      - "--filtering_channel_ids=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8"
+      - "--blocking_channel_ids=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6"
+      - "--prometheus_port=2112"                # comment out to disable prometheus metrics
