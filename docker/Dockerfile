@@ -41,9 +41,6 @@ RUN rm ~/.cache -rf
 # entry point
 VOLUME $db_dir
 ENV DB_DIRECTORY=$db_dir
-ENV MAX_SEND=1000000000000000000
-ENV MAX_RECEIVE=1000000000000000000
-
 
 COPY ./docker/scribe_entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
