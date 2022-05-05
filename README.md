@@ -72,6 +72,10 @@ If you have the resources to run all of the services on one machine (at least 30
 
 ### Options
 
+#### Content blocking and filtering
+
+For various reasons it may be desirable to block or filtering content from claim search and resolve results, [here](https://github.com/lbryio/scribe/blob/master/blocking.md) are instructions for how to configure and use this feature as well as information about the recommended defaults.
+
 #### Common options across `scribe`, `scribe-hub`, and `scribe-elastic-sync`:
   - `--db_dir` (required) Path of the directory containing lbry-rocksdb, set from the environment with `DB_DIRECTORY`
   - `--daemon_url` (required for `scribe` and `scribe-hub`) URL for rpc from lbrycrd or lbcd<rpcuser>:<rpcpassword>@<lbrycrd rpc ip><lbrycrd rpc port>.
