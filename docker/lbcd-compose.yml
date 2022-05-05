@@ -1,0 +1,19 @@
+version: "3"
+
+volumes:
+  lbcd:
+
+services:
+  lbcd:
+    image: lbry/lbcd:latest
+    restart: always
+    network_mode: host
+    command:
+      - "--rpcuser=lbry"
+      - "--rpcpass=lbry"
+      - "--rpclisten=127.0.0.1"
+    volumes:
+      - "lbcd:/root/.lbcd"
+    ports:
+      - "127.0.0.1:9245:9245"
+      - "9246:9246"  # p2p port

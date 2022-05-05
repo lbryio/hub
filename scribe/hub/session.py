@@ -28,7 +28,7 @@ from scribe.hub.common import BatchRequest, ProtocolError, Request, Batch, Notif
 from scribe.hub.framer import NewlineFramer
 if typing.TYPE_CHECKING:
     from scribe.db import HubDB
-    from scribe.env import Env
+    from scribe.hub.env import ServerEnv
     from scribe.blockchain.daemon import LBCDaemon
     from scribe.hub.mempool import HubMemPool
 
@@ -164,7 +164,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'HubMemPool',
+    def __init__(self, env: 'ServerEnv', db: 'HubDB', mempool: 'HubMemPool',
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
@@ -230,10 +230,6 @@ class SessionManager:
         host = env.cs_host()
         if env.tcp_port is not None:
             await self._start_server('TCP', host, env.tcp_port)
-        if env.ssl_port is not None:
-            sslc = ssl.SSLContext(ssl.PROTOCOL_TLS)
-            sslc.load_cert_chain(env.ssl_certfile, keyfile=env.ssl_keyfile)
-            await self._start_server('SSL', host, env.ssl_port, ssl=sslc)
 
     async def _close_servers(self, kinds):
         """Close the servers of the given kinds (TCP etc.)."""
@@ -698,7 +694,6 @@ class LBRYElectrumX(asyncio.Protocol):
 
         self.kind = kind  # 'RPC', 'TCP' etc.
         self.coin = self.env.coin
-        self.anon_logs = self.env.anon_logs
         self.txs_sent = 0
         self.log_me = False
         self.daemon_request = self.session_manager.daemon_request
@@ -784,19 +779,6 @@ class LBRYElectrumX(asyncio.Protocol):
 
     def default_framer(self):
         return NewlineFramer(self.env.max_receive)
-
-    def peer_address_str(self, *, for_log=True):
-        """Returns the peer's IP address and port as a human-readable
-        string, respecting anon logs if the output is for a log."""
-        if for_log and self.anon_logs:
-            return 'xx.xx.xx.xx:xx'
-        if not self._address:
-            return 'unknown'
-        ip_addr_str, port = self._address[:2]
-        if ':' in ip_addr_str:
-            return f'[{ip_addr_str}]:{port}'
-        else:
-            return f'{ip_addr_str}:{port}'
 
     def toggle_logging(self):
         self.log_me = not self.log_me
@@ -1037,7 +1019,7 @@ class LBRYElectrumX(asyncio.Protocol):
             await self._send_message(message)
             return True
         except asyncio.TimeoutError:
-            self.logger.info("timeout sending address notification to %s", self.peer_address_str(for_log=True))
+            self.logger.info(f"timeout sending address notification to {self._address[0]}:{self._address[1]}")
             self.abort()
             return False
 
@@ -1048,7 +1030,7 @@ class LBRYElectrumX(asyncio.Protocol):
             await self._send_message(message)
             return True
         except asyncio.TimeoutError:
-            self.logger.info("timeout sending address notification to %s", self.peer_address_str(for_log=True))
+            self.logger.info(f"timeout sending address notification to {self._address[0]}:{self._address[1]}")
             self.abort()
             return False
 
@@ -1078,7 +1060,7 @@ class LBRYElectrumX(asyncio.Protocol):
         """Return the server features dictionary."""
         min_str, max_str = cls.protocol_min_max_strings()
         cls.cached_server_features.update({
-            'hosts': env.hosts_dict(),
+            'hosts': {},
             'pruning': None,
             'server_version': cls.version,
             'protocol_min': min_str,

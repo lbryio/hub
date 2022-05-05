@@ -39,18 +39,8 @@ RUN python3.9 docker/set_build.py
 RUN rm ~/.cache -rf
 
 # entry point
-ARG host=localhost
-ARG tcp_port=50001
-ARG daemon_url=http://lbry:lbry@localhost:9245/
 VOLUME $db_dir
-ENV TCP_PORT=$tcp_port
-ENV HOST=$host
-ENV DAEMON_URL=$daemon_url
 ENV DB_DIRECTORY=$db_dir
-ENV MAX_SESSIONS=100000
-ENV MAX_SEND=1000000000000000000
-ENV MAX_RECEIVE=1000000000000000000
-
 
 COPY ./docker/scribe_entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

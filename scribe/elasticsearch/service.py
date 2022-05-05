@@ -13,13 +13,16 @@ from scribe.elasticsearch.notifier_protocol import ElasticNotifierProtocol
 from scribe.elasticsearch.search import IndexVersionMismatch, expand_query
 from scribe.elasticsearch.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
 from scribe.elasticsearch.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
+if typing.TYPE_CHECKING:
+    from scribe.elasticsearch.env import ElasticEnv
 
 
 class ElasticSyncService(BlockchainReaderService):
     VERSION = 1
 
-    def __init__(self, env):
+    def __init__(self, env: 'ElasticEnv'):
         super().__init__(env, 'lbry-elastic-writer', thread_workers=1, thread_prefix='lbry-elastic-writer')
+        self.env = env
         # self._refresh_interval = 0.1
         self._task = None
         self.index = self.env.es_index_prefix + 'claims'

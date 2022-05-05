@@ -36,7 +36,7 @@ NAMESPACE = f"{PROMETHEUS_NAMESPACE}_db"
 class HubDB:
     DB_VERSIONS = [7, 8]
 
-    def __init__(self, coin, db_dir: str, cache_MB: int = 512, reorg_limit: int = 200,
+    def __init__(self, coin, db_dir: str, reorg_limit: int = 200,
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
                  secondary_name: str = '', max_open_files: int = 64, blocking_channel_ids: List[str] = None,
                  filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None):
@@ -45,7 +45,6 @@ class HubDB:
         self._executor = executor
         self._db_dir = db_dir
 
-        self._cache_MB = cache_MB
         self._reorg_limit = reorg_limit
         self._cache_all_claim_txos = cache_all_claim_txos
         self._cache_all_tx_hashes = cache_all_tx_hashes
@@ -820,8 +819,7 @@ class HubDB:
         )
         db_path = os.path.join(self._db_dir, 'lbry-rocksdb')
         self.prefix_db = PrefixDB(
-            db_path, cache_mb=self._cache_MB,
-            reorg_limit=self._reorg_limit, max_open_files=self._db_max_open_files,
+            db_path, reorg_limit=self._reorg_limit, max_open_files=self._db_max_open_files,
             unsafe_prefixes={DBStatePrefixRow.prefix, MempoolTXPrefixRow.prefix, HashXMempoolStatusPrefixRow.prefix},
             secondary_path=secondary_path
         )

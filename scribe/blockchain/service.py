@@ -19,7 +19,7 @@ from scribe.blockchain.mempool import MemPool
 from scribe.schema.url import normalize_name
 from scribe.service import BlockchainService
 if typing.TYPE_CHECKING:
-    from scribe.env import Env
+    from scribe.blockchain.env import BlockchainEnv
     from scribe.db.revertable import RevertableOpStack
 
 
@@ -43,7 +43,7 @@ class BlockchainProcessorService(BlockchainService):
         "reorg_count", "Number of reorgs", namespace=NAMESPACE
     )
 
-    def __init__(self, env: 'Env'):
+    def __init__(self, env: 'BlockchainEnv'):
         super().__init__(env, secondary_name='', thread_workers=1, thread_prefix='block-processor')
         self.daemon = LBCDaemon(env.coin, env.daemon_url)
         self.mempool = MemPool(env.coin, self.db)
