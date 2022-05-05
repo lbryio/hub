@@ -1,5 +1,5 @@
 import time
-
+import typing
 import asyncio
 from scribe.blockchain.daemon import LBCDaemon
 from scribe.hub.session import SessionManager
@@ -7,11 +7,14 @@ from scribe.hub.mempool import HubMemPool
 from scribe.hub.udp import StatusServer
 from scribe.service import BlockchainReaderService
 from scribe.elasticsearch import ElasticNotifierClientProtocol
+if typing.TYPE_CHECKING:
+    from scribe.hub.env import ServerEnv
 
 
 class HubServerService(BlockchainReaderService):
-    def __init__(self, env):
+    def __init__(self, env: 'ServerEnv'):
         super().__init__(env, 'lbry-reader', thread_workers=max(1, env.max_query_workers), thread_prefix='hub-worker')
+        self.env = env
         self.notifications_to_send = []
         self.mempool_notifications = set()
         self.status_server = StatusServer()

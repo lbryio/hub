@@ -28,7 +28,7 @@ from scribe.hub.common import BatchRequest, ProtocolError, Request, Batch, Notif
 from scribe.hub.framer import NewlineFramer
 if typing.TYPE_CHECKING:
     from scribe.db import HubDB
-    from scribe.env import Env
+    from scribe.hub.env import ServerEnv
     from scribe.blockchain.daemon import LBCDaemon
     from scribe.hub.mempool import HubMemPool
 
@@ -164,7 +164,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'Env', db: 'HubDB', mempool: 'HubMemPool',
+    def __init__(self, env: 'ServerEnv', db: 'HubDB', mempool: 'HubMemPool',
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
