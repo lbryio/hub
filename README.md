@@ -88,6 +88,7 @@ For various reasons it may be desirable to block or filtering content from claim
 
 #### Options for `scribe`
   - `--db_max_open_files` This setting translates into the max_open_files option given to rocksdb. A higher number will use more memory. Defaults to 64.
+  - `--address_history_cache_size` The count of items in the address history cache used for processing blocks and mempool updates. A higher number will use more memory, shouldn't ever need to be higher than 10000. Defaults to 1000.
 
 #### Options for `scribe-elastic-sync`
   - `--reindex` If this flag is set drop and rebuild the elasticsearch index.

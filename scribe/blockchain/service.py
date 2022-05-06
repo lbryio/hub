@@ -50,24 +50,15 @@ class BlockchainProcessorService(BlockchainService):
         self.coin = env.coin
         self.wait_for_blocks_duration = 0.1
         self._ready_to_stop = asyncio.Event()
-
+        self.blocks_event = asyncio.Event()
+        self.prefetcher = Prefetcher(self.daemon, env.coin, self.blocks_event)
         self._caught_up_event: Optional[asyncio.Event] = None
         self.height = 0
         self.tip = bytes.fromhex(self.coin.GENESIS_HASH)[::-1]
         self.tx_count = 0
 
-        self.blocks_event = asyncio.Event()
-        self.prefetcher = Prefetcher(self.daemon, env.coin, self.blocks_event)
-        # self.logger = logging.getLogger(__name__)
-
-        # Meta
         self.touched_hashXs: Set[bytes] = set()
-
-        # UTXO cache
         self.utxo_cache: Dict[Tuple[bytes, int], Tuple[bytes, int]] = {}
-
-        # Claimtrie cache
-        self.db_op_stack: Optional['RevertableOpStack'] = None
 
         #################################
         # attributes used for calculating stake activations and takeovers per block
@@ -125,8 +116,8 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
-        self.hashX_history_cache = LRUCache(1000)
-        self.hashX_full_cache = LRUCache(1000)
+        self.hashX_history_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
+        self.hashX_full_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
 
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
