@@ -93,8 +93,8 @@ class ServerEnv(Env):
         parser.add_argument('--payment_address', default=cls.default('PAYMENT_ADDRESS', None), type=str)
         parser.add_argument('--donation_address', default=cls.default('DONATION_ADDRESS', None), type=str)
         parser.add_argument('--daily_fee', default=cls.default('DAILY_FEE', '0'), type=str)
-        parser.add_argument('--query_timeout_ms', default=cls.default('QUERY_TIMEOUT_MS', 10000), type=int)
-
+        parser.add_argument('--query_timeout_ms', type=int, default=cls.integer('QUERY_TIMEOUT_MS', 10000),
+                            help="Elasticsearch query timeout, in ms. Can be set in env with 'QUERY_TIMEOUT_MS'")
     @classmethod
     def from_arg_parser(cls, args):
         return cls(
@@ -107,7 +107,7 @@ class ServerEnv(Env):
             donation_address=args.donation_address, max_send=args.max_send, max_receive=args.max_receive,
             max_sessions=args.max_sessions, session_timeout=args.session_timeout,
             drop_client=args.drop_client, description=args.description, daily_fee=args.daily_fee,
-            database_query_timeout=args.query_timeout_ms / 1000, blocking_channel_ids=args.blocking_channel_ids,
+            database_query_timeout=args.query_timeout_ms, blocking_channel_ids=args.blocking_channel_ids,
             filtering_channel_ids=args.filtering_channel_ids, elastic_notifier_host=args.elastic_notifier_host,
             elastic_notifier_port=args.elastic_notifier_port
         )
