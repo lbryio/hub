@@ -1395,9 +1395,8 @@ class BlockchainProcessorService(BlockchainService):
 
         self.db.prefix_db.tx_count.stage_put(key_args=(height,), value_args=(tx_count,))
 
-        for k, v in self.db.prefix_db.hashX_mempool_status.iterate(
-            start=(b'\x00' * 20, ), stop=(b'\xff' * 20, ), deserialize_key=False, deserialize_value=False):
-            self.db.prefix_db.stage_raw_delete(k, v)
+        # clear the mempool tx index
+        self._get_clear_mempool_ops()
 
         for hashX, new_history in self.hashXs_by_tx.items():
             # TODO: combine this with compaction so that we only read the history once
@@ -1449,6 +1448,12 @@ class BlockchainProcessorService(BlockchainService):
         self.db.assert_db_state()
         # print("*************\n")
         return txo_count
+
+    def _get_clear_mempool_ops(self):
+        self.db.prefix_db.multi_delete(
+            list(self.db.prefix_db.hashX_mempool_status.iterate(start=(b'\x00' * 20, ), stop=(b'\xff' * 20, ),
+                                                                deserialize_key=False, deserialize_value=False))
+        )
 
     def clear_after_advance_or_reorg(self):
         self.txo_to_claim.clear()
