@@ -157,6 +157,14 @@ class HubMemPool:
             result.append(MemPoolTxSummary(tx_hash, tx.fee, has_ui))
         return result
 
+    def mempool_history(self, hashX: bytes) -> str:
+        result = ''
+        for tx_hash in self.touched_hashXs.get(hashX, ()):
+            if tx_hash not in self.txs:
+                continue  # the tx hash for the touched address is an input that isn't in mempool anymore
+            result += f'{tx_hash[::-1].hex()}:{-any(_hash in self.txs for _hash, idx in self.txs[tx_hash].in_pairs):d}:'
+        return result
+
     def unordered_UTXOs(self, hashX):
         """Return an unordered list of UTXO named tuples from mempool
         transactions that pay to hashX.
@@ -276,7 +284,6 @@ class HubMemPool:
             if session.subscribe_headers and height_changed:
                 sent_headers += 1
             self._notification_q.put_nowait((session_id, height_changed, hashXes))
-
         if sent_headers:
             self.logger.info(f'notified {sent_headers} sessions of new block header')
         if session_hashxes_to_notify:

@@ -31,7 +31,7 @@ class Env:
 
     def __init__(self, db_dir=None, max_query_workers=None, chain=None, reorg_limit=None,
                  prometheus_port=None, cache_all_tx_hashes=None, cache_all_claim_txos=None,
-                 blocking_channel_ids=None, filtering_channel_ids=None):
+                 blocking_channel_ids=None, filtering_channel_ids=None, index_address_status=None):
 
         self.logger = logging.getLogger(__name__)
         self.db_dir = db_dir if db_dir is not None else self.required('DB_DIRECTORY')
@@ -52,6 +52,8 @@ class Env:
             'BLOCKING_CHANNEL_IDS', '').split(' ')
         self.filtering_channel_ids = filtering_channel_ids if filtering_channel_ids is not None else self.default(
             'FILTERING_CHANNEL_IDS', '').split(' ')
+        self.index_address_status = index_address_status if index_address_status is not None else \
+            self.boolean('INDEX_ADDRESS_STATUS', False)
 
     @classmethod
     def default(cls, envvar, default):
@@ -187,6 +189,12 @@ class Env:
                                  "Claims that are reposted by these channels aren't returned in search results. "
                                  "Can be set in env with 'FILTERING_CHANNEL_IDS'",
                             default=cls.default('FILTERING_CHANNEL_IDS', '').split(' '))
+        parser.add_argument('--index_address_statuses', action='store_true',
+                            help="Use precomputed address statuses, must be enabled in the reader and the writer to "
+                                 "use it. If disabled (the default), the status of an address must be calculated at "
+                                 "runtime when clients request it (address subscriptions, address history sync). "
+                                 "If enabled, scribe will maintain an index of precomputed statuses",
+                            default=cls.boolean('INDEX_ADDRESS_STATUS', False))
 
     @classmethod
     def from_arg_parser(cls, args):

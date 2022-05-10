@@ -39,7 +39,8 @@ class HubDB:
     def __init__(self, coin, db_dir: str, reorg_limit: int = 200,
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
                  secondary_name: str = '', max_open_files: int = 64, blocking_channel_ids: List[str] = None,
-                 filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None):
+                 filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
+                 index_address_status=False):
         self.logger = logging.getLogger(__name__)
         self.coin = coin
         self._executor = executor
@@ -52,6 +53,7 @@ class HubDB:
         if secondary_name:
             assert max_open_files == -1, 'max open files must be -1 for secondary readers'
         self._db_max_open_files = max_open_files
+        self._index_address_status = index_address_status
         self.prefix_db: typing.Optional[PrefixDB] = None
 
         self.hist_unflushed = defaultdict(partial(array.array, 'I'))

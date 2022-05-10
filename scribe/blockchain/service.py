@@ -146,8 +146,9 @@ class BlockchainProcessorService(BlockchainService):
         def update_mempool(unsafe_commit, mempool_prefix, to_put, to_delete):
             self.mempool.remove(to_delete)
             touched_hashXs = self.mempool.update_mempool(to_put)
-            for hashX in touched_hashXs:
-                self._get_update_hashX_mempool_status_ops(hashX)
+            if self.env.index_address_status:
+                for hashX in touched_hashXs:
+                    self._get_update_hashX_mempool_status_ops(hashX)
             for tx_hash, raw_tx in to_put:
                 mempool_prefix.stage_put((tx_hash,), (raw_tx,))
             for tx_hash, raw_tx in to_delete.items():
@@ -1290,22 +1291,6 @@ class BlockchainProcessorService(BlockchainService):
             status = sha256(history.encode())
             self.db.prefix_db.hashX_mempool_status.stage_put((hashX,), (status,))
 
-    def _get_compactify_hashX_history_ops(self, height: int, hashX: bytes):
-        if height > self.env.reorg_limit:  # compactify existing history
-            hist_txs = b''
-            # accumulate and delete all of the tx histories between height 1 and current - reorg_limit
-            for k, hist in self.db.prefix_db.hashX_history.iterate(
-                    start=(hashX, 1), stop=(hashX, height - self.env.reorg_limit),
-                    deserialize_key=False, deserialize_value=False):
-                hist_txs += hist
-                self.db.prefix_db.stage_raw_delete(k, hist)
-            if hist_txs:
-                # add the accumulated histories onto the existing compacted history at height 0
-                key = self.db.prefix_db.hashX_history.pack_key(hashX, 0)
-                existing = self.db.prefix_db.get(key)
-                if existing is not None:
-                    self.db.prefix_db.stage_raw_delete(key, existing)
-                self.db.prefix_db.stage_raw_put(key, (existing or b'') + hist_txs)
 
     def advance_block(self, block: Block):
         height = self.height + 1
@@ -1398,15 +1383,11 @@ class BlockchainProcessorService(BlockchainService):
         # clear the mempool tx index
         self._get_clear_mempool_ops()
 
-        for hashX, new_history in self.hashXs_by_tx.items():
-            # TODO: combine this with compaction so that we only read the history once
-            self._get_update_hashX_status_ops(
-                hashX, [(self.pending_transactions[tx_num], height) for tx_num in new_history]
-            )
-            self._get_compactify_hashX_history_ops(height, hashX)
-            if not new_history:
-                continue
-            self.db.prefix_db.hashX_history.stage_put(key_args=(hashX, height), value_args=(new_history,))
+        # update hashX history status hashes and compactify the histories
+        self._get_update_hashX_histories_ops(height)
+
+        if not self.db.catching_up and self.env.index_address_status:
+            self._get_compactify_ops(height)
 
         self.tx_count = tx_count
         self.db.tx_counts.append(self.tx_count)
@@ -1454,6 +1435,88 @@ class BlockchainProcessorService(BlockchainService):
             list(self.db.prefix_db.hashX_mempool_status.iterate(start=(b'\x00' * 20, ), stop=(b'\xff' * 20, ),
                                                                 deserialize_key=False, deserialize_value=False))
         )
+
+    def _get_update_hashX_histories_ops(self, height: int):
+        self.db.prefix_db.hashX_history.stage_multi_put(
+            [((hashX, height), (new_tx_nums,)) for hashX, new_tx_nums in self.hashXs_by_tx.items()]
+        )
+
+    def _get_compactify_ops(self, height: int):
+        existing_hashX_statuses = self.db.prefix_db.hashX_status.multi_get([(hashX,) for hashX in self.hashXs_by_tx.keys()], deserialize_value=False)
+        if existing_hashX_statuses:
+            pack_key = self.db.prefix_db.hashX_status.pack_key
+            keys = [
+                pack_key(hashX) for hashX, existing in zip(
+                    self.hashXs_by_tx, existing_hashX_statuses
+                )
+            ]
+            self.db.prefix_db.multi_delete([(k, v) for k, v in zip(keys, existing_hashX_statuses) if v is not None])
+
+        block_hashX_history_deletes = []
+        append_deletes_hashX_history = block_hashX_history_deletes.append
+        block_hashX_history_puts = []
+
+        for (hashX, new_tx_nums), existing in zip(self.hashXs_by_tx.items(), existing_hashX_statuses):
+            new_history = [(self.pending_transactions[tx_num], height) for tx_num in new_tx_nums]
+
+            tx_nums = []
+            txs_extend = tx_nums.extend
+            compact_hist_txs = []
+            compact_txs_extend = compact_hist_txs.extend
+            history_item_0 = None
+            existing_item_0 = None
+            reorg_limit = self.env.reorg_limit
+            unpack_history = self.db.prefix_db.hashX_history.unpack_value
+            unpack_key = self.db.prefix_db.hashX_history.unpack_key
+            needs_compaction = False
+
+            total_hist_txs = b''
+            for k, hist in self.db.prefix_db.hashX_history.iterate(prefix=(hashX,), deserialize_key=False,
+                                                                   deserialize_value=False):
+                hist_txs = unpack_history(hist)
+                total_hist_txs += hist
+                txs_extend(hist_txs)
+                hist_height = unpack_key(k).height
+                if height > reorg_limit and hist_height < height - reorg_limit:
+                    compact_txs_extend(hist_txs)
+                    if hist_height == 0:
+                        history_item_0 = (k, hist)
+                    elif hist_height > 0:
+                        needs_compaction = True
+                        # self.db.prefix_db.stage_raw_delete(k, hist)
+                        append_deletes_hashX_history((k, hist))
+                        existing_item_0 = history_item_0
+            if needs_compaction:
+                # add the accumulated histories onto the existing compacted history at height 0
+                if existing_item_0 is not None:  # delete if key 0 exists
+                    key, existing = existing_item_0
+                    append_deletes_hashX_history((key, existing))
+                block_hashX_history_puts.append(((hashX, 0), (compact_hist_txs,)))
+            if not new_history:
+                continue
+
+            needed_tx_infos = []
+            append_needed_tx_info = needed_tx_infos.append
+            tx_infos = {}
+            for tx_num in tx_nums:
+                if tx_num in self.history_tx_info_cache:
+                    tx_infos[tx_num] = self.history_tx_info_cache[tx_num]
+                else:
+                    append_needed_tx_info(tx_num)
+            if needed_tx_infos:
+                for tx_num, tx_hash in zip(needed_tx_infos, self.db.get_tx_hashes(needed_tx_infos)):
+                    tx_info = f'{tx_hash[::-1].hex()}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+                    tx_infos[tx_num] = tx_info
+                    self.history_tx_info_cache[tx_num] = tx_info
+            history = ''.join(map(tx_infos.__getitem__, tx_nums))
+            for tx_hash, height in new_history:
+                history += f'{tx_hash[::-1].hex()}:{height:d}:'
+            if history:
+                status = sha256(history.encode())
+                self.db.prefix_db.hashX_status.stage_put((hashX,), (status,))
+
+        self.db.prefix_db.multi_delete(block_hashX_history_deletes)
+        self.db.prefix_db.hashX_history.stage_multi_put(block_hashX_history_puts)
 
     def clear_after_advance_or_reorg(self):
         self.txo_to_claim.clear()
