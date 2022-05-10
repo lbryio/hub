@@ -101,6 +101,9 @@ class PrefixRow(metaclass=PrefixRowType):
             handle_value(result[packed_keys[tuple(k_args)]]) for k_args in key_args
         ]
 
+    def stage_multi_put(self, items):
+        self._op_stack.multi_put([RevertablePut(self.pack_key(*k), self.pack_value(*v)) for k, v in items])
+
     def get_pending(self, *key_args, fill_cache=True, deserialize_value=True):
         packed_key = self.pack_key(*key_args)
         last_op = self._op_stack.get_last_op_for_key(packed_key)
@@ -178,7 +181,7 @@ class BasePrefixDB:
                 cf = self._db.get_column_family(prefix.value)
             self.column_families[prefix.value] = cf
 
-        self._op_stack = RevertableOpStack(self.get, unsafe_prefixes=unsafe_prefixes)
+        self._op_stack = RevertableOpStack(self.get, self.multi_get, unsafe_prefixes=unsafe_prefixes)
         self._max_undo_depth = max_undo_depth
 
     def unsafe_commit(self):
@@ -258,6 +261,17 @@ class BasePrefixDB:
     def get(self, key: bytes, fill_cache: bool = True) -> Optional[bytes]:
         cf = self.column_families[key[:1]]
         return self._db.get((cf, key), fill_cache=fill_cache)
+
+    def multi_get(self, keys: typing.List[bytes], fill_cache=True):
+        first_key = keys[0]
+        if not all(first_key[0] == key[0] for key in keys):
+            raise ValueError('cannot multi-delete across column families')
+        cf = self.column_families[first_key[:1]]
+        db_result = self._db.multi_get([(cf, k) for k in keys], fill_cache=fill_cache)
+        return list(db_result.values())
+
+    def multi_delete(self, items: typing.List[typing.Tuple[bytes, bytes]]):
+        self._op_stack.multi_delete([RevertableDelete(k, v) for k, v in items])
 
     def iterator(self, start: bytes, column_family: 'rocksdb.ColumnFamilyHandle' = None,
                  iterate_lower_bound: bytes = None, iterate_upper_bound: bytes = None,
