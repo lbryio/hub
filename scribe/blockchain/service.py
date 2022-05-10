@@ -118,6 +118,7 @@ class BlockchainProcessorService(BlockchainService):
 
         self.hashX_history_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
         self.hashX_full_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
+        self.history_tx_info_cache = LRUCache(2 ** 20)
 
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
@@ -1245,9 +1246,21 @@ class BlockchainProcessorService(BlockchainService):
             self.hashX_history_cache[hashX] = tx_nums = self.db.read_history(hashX, limit=None)
         else:
             tx_nums = self.hashX_history_cache[hashX]
+        needed_tx_infos = []
+        append_needed_tx_info = needed_tx_infos.append
+        tx_infos = {}
+        for tx_num in tx_nums:
+            if tx_num in self.history_tx_info_cache:
+                tx_infos[tx_num] = self.history_tx_info_cache[tx_num]
+            else:
+                append_needed_tx_info(tx_num)
+        if needed_tx_infos:
+            for tx_num, tx_hash in zip(needed_tx_infos, self.db.get_tx_hashes(needed_tx_infos)):
+                tx_infos[tx_num] = self.history_tx_info_cache[tx_num] = f'{tx_hash[::-1].hex()}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+
         history = ''
-        for tx_num, tx_hash in zip(tx_nums, self.db.get_tx_hashes(tx_nums)):
-            history += f'{hash_to_hex_str(tx_hash)}:{bisect_right(self.db.tx_counts, tx_num):d}:'
+        for tx_num in tx_nums:
+            history += tx_infos[tx_num]
         self.hashX_full_cache[hashX] = history
         return history
 
@@ -1491,9 +1504,15 @@ class BlockchainProcessorService(BlockchainService):
         if self.env.cache_all_tx_hashes:
             while len(self.db.total_transactions) > self.db.tx_counts[-1]:
                 self.db.tx_num_mapping.pop(self.db.total_transactions.pop())
+                if self.tx_count in self.history_tx_info_cache:
+                    self.history_tx_info_cache.pop(self.tx_count)
                 self.tx_count -= 1
         else:
-            self.tx_count = self.db.tx_counts[-1]
+            new_tx_count = self.db.tx_counts[-1]
+            while self.tx_count > new_tx_count:
+                if self.tx_count in self.history_tx_info_cache:
+                    self.history_tx_info_cache.pop(self.tx_count)
+                self.tx_count -= 1
         self.height -= 1
 
         # self.touched can include other addresses which is
