@@ -118,7 +118,7 @@ class BlockchainProcessorService(BlockchainService):
 
         self.hashX_history_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
         self.hashX_full_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
-        self.history_tx_info_cache = LRUCache(2 ** 20)
+        self.history_tx_info_cache = LRUCache(2 ** 16)
 
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
