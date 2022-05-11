@@ -828,6 +828,8 @@ class HubDB:
         # read db state
         self.read_db_state()
 
+        self.logger.info("index address statuses: %s", self._index_address_status)
+
         # These are our state as we move ahead of DB state
         self.fs_height = self.db_height
         self.fs_tx_count = self.db_tx_count
