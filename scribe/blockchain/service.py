@@ -1265,23 +1265,6 @@ class BlockchainProcessorService(BlockchainService):
         self.hashX_full_cache[hashX] = history
         return history
 
-    def _get_update_hashX_status_ops(self, hashX: bytes, new_history: List[Tuple[bytes, int]]):
-        existing = self.db.prefix_db.hashX_status.get(hashX)
-        if existing:
-            self.db.prefix_db.hashX_status.stage_delete((hashX,), existing)
-        if hashX not in self.hashX_history_cache:
-            tx_nums = self.db.read_history(hashX, limit=None)
-        else:
-            tx_nums = self.hashX_history_cache[hashX]
-        history = ''
-        for tx_num, tx_hash in zip(tx_nums, self.db.get_tx_hashes(tx_nums)):
-            history += f'{hash_to_hex_str(tx_hash)}:{bisect_right(self.db.tx_counts, tx_num):d}:'
-        for tx_hash, height in new_history:
-            history += f'{hash_to_hex_str(tx_hash)}:{height:d}:'
-        if history:
-            status = sha256(history.encode())
-            self.db.prefix_db.hashX_status.stage_put((hashX,), (status,))
-
     def _get_update_hashX_mempool_status_ops(self, hashX: bytes):
         existing = self.db.prefix_db.hashX_mempool_status.get(hashX)
         if existing:
@@ -1290,7 +1273,6 @@ class BlockchainProcessorService(BlockchainService):
         if history:
             status = sha256(history.encode())
             self.db.prefix_db.hashX_mempool_status.stage_put((hashX,), (status,))
-
 
     def advance_block(self, block: Block):
         height = self.height + 1
