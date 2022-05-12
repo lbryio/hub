@@ -420,12 +420,40 @@ class DBState(typing.NamedTuple):
     tip: bytes
     utxo_flush_count: int
     wall_time: int
-    catching_up: bool
+    bit_fields: int
     db_version: int
     hist_flush_count: int
     comp_flush_count: int
     comp_cursor: int
     es_sync_height: int
+    hashX_status_last_indexed_height: int
+
+    @property
+    def catching_up(self) -> bool:
+        return self.bit_fields & 1 == 1
+
+    @property
+    def index_address_statuses(self) -> bool:
+        return self.bit_fields & 2 == 1
+
+    @property
+    def expanded(self):
+        return (
+            self.genesis,
+            self.height,
+            self.tx_count,
+            self.tip,
+            self.utxo_flush_count,
+            self.wall_time,
+            self.catching_up,
+            self.index_address_statuses,
+            self.db_version,
+            self.hist_flush_count,
+            self.comp_flush_count,
+            self.comp_cursor,
+            self.es_sync_height,
+            self.hashX_status_last_indexed_height
+        )
 
 
 class ActiveAmountPrefixRow(PrefixRow):
@@ -1420,7 +1448,7 @@ class SupportAmountPrefixRow(PrefixRow):
 
 class DBStatePrefixRow(PrefixRow):
     prefix = DB_PREFIXES.db_state.value
-    value_struct = struct.Struct(b'>32sLL32sLLBBlllL')
+    value_struct = struct.Struct(b'>32sLL32sLLBBlllLL')
     key_struct = struct.Struct(b'')
 
     key_part_lambdas = [
@@ -1437,12 +1465,16 @@ class DBStatePrefixRow(PrefixRow):
 
     @classmethod
     def pack_value(cls, genesis: bytes, height: int, tx_count: int, tip: bytes, utxo_flush_count: int, wall_time: int,
-                   catching_up: bool, db_version: int, hist_flush_count: int, comp_flush_count: int,
-                   comp_cursor: int, es_sync_height: int) -> bytes:
+                   catching_up: bool, index_address_statuses: bool, db_version: int, hist_flush_count: int,
+                   comp_flush_count: int, comp_cursor: int, es_sync_height: int,
+                   last_indexed_address_statuses: int) -> bytes:
+        bit_fields = 0
+        bit_fields |= int(catching_up) << 0
+        bit_fields |= int(index_address_statuses) << 1
         return super().pack_value(
             genesis, height, tx_count, tip, utxo_flush_count,
-            wall_time, 1 if catching_up else 0, db_version, hist_flush_count,
-            comp_flush_count, comp_cursor, es_sync_height
+            wall_time, bit_fields, db_version, hist_flush_count,
+            comp_flush_count, comp_cursor, es_sync_height, last_indexed_address_statuses
         )
 
     @classmethod
@@ -1451,15 +1483,18 @@ class DBStatePrefixRow(PrefixRow):
             # TODO: delete this after making a new snapshot - 10/20/21
             # migrate in the es_sync_height if it doesnt exist
             data += data[32:36]
+        if len(data) == 98:
+            data += data[32:36]
         return DBState(*super().unpack_value(data))
 
     @classmethod
     def pack_item(cls, genesis: bytes, height: int, tx_count: int, tip: bytes, utxo_flush_count: int, wall_time: int,
-                  catching_up: bool, db_version: int, hist_flush_count: int, comp_flush_count: int,
-                  comp_cursor: int, es_sync_height: int):
+                  catching_up: bool, index_address_statuses: bool, db_version: int, hist_flush_count: int,
+                  comp_flush_count: int, comp_cursor: int, es_sync_height: int, last_indexed_address_statuses: int):
         return cls.pack_key(), cls.pack_value(
-            genesis, height, tx_count, tip, utxo_flush_count, wall_time, catching_up, db_version, hist_flush_count,
-            comp_flush_count, comp_cursor, es_sync_height
+            genesis, height, tx_count, tip, utxo_flush_count, wall_time, catching_up, index_address_statuses,
+            db_version, hist_flush_count, comp_flush_count, comp_cursor, es_sync_height,
+            last_indexed_address_statuses
         )
 
 

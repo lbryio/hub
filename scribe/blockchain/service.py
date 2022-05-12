@@ -45,6 +45,7 @@ class BlockchainProcessorService(BlockchainService):
 
     def __init__(self, env: 'BlockchainEnv'):
         super().__init__(env, secondary_name='', thread_workers=1, thread_prefix='block-processor')
+        self.env = env
         self.daemon = LBCDaemon(env.coin, env.daemon_url)
         self.mempool = MemPool(env.coin, self.db)
         self.coin = env.coin
@@ -1704,6 +1705,10 @@ class BlockchainProcessorService(BlockchainService):
 
     async def _finished_initial_catch_up(self):
         self.log.info(f'caught up to height {self.height}')
+
+        # if self.env.index_address_status and self.db.last_indexed_address_status_height != self.db.db_height:
+        #     await self.db.rebuild_hashX_status_index(self.db.last_indexed_address_status_height)
+
         # Flush everything but with catching_up->False state.
         self.db.catching_up = False
 
@@ -1719,12 +1724,27 @@ class BlockchainProcessorService(BlockchainService):
         while self.db.db_version < max(self.db.DB_VERSIONS):
             if self.db.db_version == 7:
                 from scribe.db.migrators.migrate7to8 import migrate, FROM_VERSION, TO_VERSION
+            elif self.db.db_version == 8:
+                from scribe.db.migrators.migrate8to9 import migrate, FROM_VERSION, TO_VERSION
+                self.db._index_address_status = self.env.index_address_status
             else:
                 raise RuntimeError("unknown db version")
             self.log.warning(f"migrating database from version {FROM_VERSION} to version {TO_VERSION}")
             migrate(self.db)
             self.log.info("finished migration")
             self.db.read_db_state()
+
+        # update the hashX status index if was off before and is now on of if requested from a height
+        if (self.env.index_address_status and not self.db._index_address_status and self.db.last_indexed_address_status_height < self.db.db_height) or self.env.rebuild_address_status_from_height >= 0:
+            starting_height = self.db.last_indexed_address_status_height
+            if self.env.rebuild_address_status_from_height >= 0:
+                starting_height = self.env.rebuild_address_status_from_height
+            yield self.db.rebuild_hashX_status_index(starting_height)
+        elif self.db._index_address_status and not self.env.index_address_status:
+            self.log.warning("turned off address indexing at block %i", self.db.db_height)
+            self.db._index_address_status = False
+            self.db.write_db_state()
+            self.db.prefix_db.unsafe_commit()
 
         self.height = self.db.db_height
         self.tip = self.db.db_tip

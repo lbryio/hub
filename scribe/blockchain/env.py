@@ -6,14 +6,15 @@ class BlockchainEnv(Env):
                  prometheus_port=None, cache_all_tx_hashes=None, cache_all_claim_txos=None,
                  blocking_channel_ids=None, filtering_channel_ids=None,
                  db_max_open_files=64, daemon_url=None, hashX_history_cache_size=None,
-                 index_address_status=None):
+                 index_address_status=None, rebuild_address_status_from_height=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
                          cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.db_max_open_files = db_max_open_files
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
         self.hashX_history_cache_size = hashX_history_cache_size if hashX_history_cache_size is not None \
             else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 1000)
-
+        self.rebuild_address_status_from_height = rebuild_address_status_from_height \
+            if isinstance(rebuild_address_status_from_height, int) else -1
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
@@ -31,6 +32,9 @@ class BlockchainEnv(Env):
                             help="LRU cache size for address histories, used when processing new blocks "
                                  "and when processing mempool updates. Can be set in env with "
                                  "'ADDRESS_HISTORY_CACHE_SIZE'")
+        parser.add_argument('--rebuild_address_status_from_height', type=int, default=-1,
+                            help="Rebuild address statuses, set to 0 to reindex all address statuses or provide a "
+                                 "block height to start reindexing from. Defaults to -1 (off).")
 
     @classmethod
     def from_arg_parser(cls, args):
@@ -39,5 +43,6 @@ class BlockchainEnv(Env):
             max_query_workers=args.max_query_workers, chain=args.chain, reorg_limit=args.reorg_limit,
             prometheus_port=args.prometheus_port, cache_all_tx_hashes=args.cache_all_tx_hashes,
             cache_all_claim_txos=args.cache_all_claim_txos, index_address_status=args.index_address_statuses,
-            hashX_history_cache_size=args.address_history_cache_size
+            hashX_history_cache_size=args.address_history_cache_size,
+            rebuild_address_status_from_height=args.rebuild_address_status_from_height
         )
