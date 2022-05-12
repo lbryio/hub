@@ -38,5 +38,6 @@ class BlockchainEnv(Env):
             db_dir=args.db_dir, daemon_url=args.daemon_url, db_max_open_files=args.db_max_open_files,
             max_query_workers=args.max_query_workers, chain=args.chain, reorg_limit=args.reorg_limit,
             prometheus_port=args.prometheus_port, cache_all_tx_hashes=args.cache_all_tx_hashes,
-            cache_all_claim_txos=args.cache_all_claim_txos
+            cache_all_claim_txos=args.cache_all_claim_txos, index_address_status=args.index_address_statuses,
+            hashX_history_cache_size=args.address_history_cache_size
         )

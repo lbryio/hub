@@ -10,9 +10,10 @@ class ServerEnv(Env):
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
                  session_timeout=None, drop_client=None, description=None, daily_fee=None,
                  database_query_timeout=None, elastic_notifier_host=None, elastic_notifier_port=None,
-                 blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None):
+                 blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None,
+                 index_address_status=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
-                         cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids)
+                         cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
         self.host = host if host is not None else self.default('HOST', 'localhost')
         self.elastic_host = elastic_host if elastic_host is not None else self.default('ELASTIC_HOST', 'localhost')
@@ -109,5 +110,5 @@ class ServerEnv(Env):
             drop_client=args.drop_client, description=args.description, daily_fee=args.daily_fee,
             database_query_timeout=args.query_timeout_ms, blocking_channel_ids=args.blocking_channel_ids,
             filtering_channel_ids=args.filtering_channel_ids, elastic_notifier_host=args.elastic_notifier_host,
-            elastic_notifier_port=args.elastic_notifier_port
+            elastic_notifier_port=args.elastic_notifier_port, index_address_status=args.index_address_statuses
         )
