@@ -1089,10 +1089,8 @@ class LBRYElectrumX(asyncio.Protocol):
         return len(self.hashX_subs)
 
     async def get_hashX_status(self, hashX: bytes):
-        self.session_manager.db.last_flush
         if self.env.index_address_status:
-            loop = self.loop
-            return await loop.run_in_executor(None, self.db.get_hashX_status, hashX)
+            return await self.db.get_hashX_status(hashX)
         history = ''.join(
             f"{tx_hash[::-1].hex()}:{height:d}:"
             for tx_hash, height in await self.db.limited_history(hashX, limit=None)

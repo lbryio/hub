@@ -864,13 +864,16 @@ class HubDB:
         self.prefix_db.close()
         self.prefix_db = None
 
-    def get_hashX_status(self, hashX: bytes):
+    def _get_hashX_status(self, hashX: bytes):
         mempool_status = self.prefix_db.hashX_mempool_status.get(hashX, deserialize_value=False)
         if mempool_status:
             return mempool_status.hex()
         status = self.prefix_db.hashX_status.get(hashX, deserialize_value=False)
         if status:
             return status.hex()
+
+    async def get_hashX_status(self, hashX: bytes):
+        return await asyncio.get_event_loop().run_in_executor(self._executor, self._get_hashX_status, hashX)
 
     def get_tx_hash(self, tx_num: int) -> bytes:
         if self._cache_all_tx_hashes:
