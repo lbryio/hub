@@ -1693,6 +1693,8 @@ class BlockchainProcessorService(BlockchainService):
             self._ready_to_stop.set()
 
     async def _need_catch_up(self):
+        self.log.info("database has fallen behind blockchain daemon, catching up")
+
         self.db.catching_up = True
 
         def flush():
@@ -1706,8 +1708,8 @@ class BlockchainProcessorService(BlockchainService):
     async def _finished_initial_catch_up(self):
         self.log.info(f'caught up to height {self.height}')
 
-        # if self.env.index_address_status and self.db.last_indexed_address_status_height != self.db.db_height:
-        #     await self.db.rebuild_hashX_status_index(self.db.last_indexed_address_status_height)
+        if self.env.index_address_status and self.db.last_indexed_address_status_height < self.db.db_height:
+            await self.db.rebuild_hashX_status_index(self.db.last_indexed_address_status_height)
 
         # Flush everything but with catching_up->False state.
         self.db.catching_up = False
