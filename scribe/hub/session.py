@@ -128,7 +128,7 @@ class SessionManager:
     session_count_metric = Gauge("session_count", "Number of connected client sessions", namespace=NAMESPACE,
                                  labelnames=("version",))
     request_count_metric = Counter("requests_count", "Number of requests received", namespace=NAMESPACE,
-                                   labelnames=("method", "version"))
+                                   labelnames=("method",))
     tx_request_count_metric = Counter("requested_transaction", "Number of transactions requested", namespace=NAMESPACE)
     tx_replied_count_metric = Counter("replied_transaction", "Number of transactions responded", namespace=NAMESPACE)
     urls_to_resolve_count_metric = Counter("urls_to_resolve", "Number of urls to resolve", namespace=NAMESPACE)
@@ -644,9 +644,9 @@ class LBRYElectrumX(asyncio.Protocol):
     MAX_CHUNK_SIZE = 40960
     session_counter = itertools.count()
     RESPONSE_TIMES = Histogram("response_time", "Response times", namespace=NAMESPACE,
-                               labelnames=("method", "version"), buckets=HISTOGRAM_BUCKETS)
+                               labelnames=("method",), buckets=HISTOGRAM_BUCKETS)
     NOTIFICATION_COUNT = Counter("notification", "Number of notifications sent (for subscriptions)",
-                                 namespace=NAMESPACE, labelnames=("method", "version"))
+                                 namespace=NAMESPACE, labelnames=("method",))
     REQUEST_ERRORS_COUNT = Counter(
         "request_error", "Number of requests that returned errors", namespace=NAMESPACE,
         labelnames=("method", "version")
@@ -793,7 +793,7 @@ class LBRYElectrumX(asyncio.Protocol):
         """Handle an incoming request.  ElectrumX doesn't receive
         notifications from client sessions.
         """
-        self.session_manager.request_count_metric.labels(method=request.method, version=self.client_version).inc()
+        self.session_manager.request_count_metric.labels(method=request.method).inc()
 
         if isinstance(request, Request):
             method = request.method
@@ -981,10 +981,7 @@ class LBRYElectrumX(asyncio.Protocol):
                               'internal server error')
         if isinstance(request, Request):
             message = request.send_result(result)
-            self.RESPONSE_TIMES.labels(
-                method=request.method,
-                version=self.client_version
-            ).observe(time.perf_counter() - start)
+            self.RESPONSE_TIMES.labels(method=request.method).observe(time.perf_counter() - start)
             if message:
                 await self._send_message(message)
         if isinstance(result, Exception):
@@ -1014,7 +1011,7 @@ class LBRYElectrumX(asyncio.Protocol):
     async def send_notification(self, method, args=()) -> bool:
         """Send an RPC notification over the network."""
         message = self.connection.send_notification(Notification(method, args))
-        self.NOTIFICATION_COUNT.labels(method=method, version=self.client_version).inc()
+        self.NOTIFICATION_COUNT.labels(method=method).inc()
         try:
             await self._send_message(message)
             return True
@@ -1119,7 +1116,7 @@ class LBRYElectrumX(asyncio.Protocol):
         start = time.perf_counter()
         self.session_manager.notifications_in_flight_metric.inc()
         for method, args in notifications:
-            self.NOTIFICATION_COUNT.labels(method=method, version=self.client_version).inc()
+            self.NOTIFICATION_COUNT.labels(method=method,).inc()
         try:
             await self.send_notifications(
                 Batch([Notification(method, (alias, status)) for (method, (alias, status)) in notifications])
