@@ -276,17 +276,11 @@ class HubDB:
             )
         return
 
-    def _resolve_claim_in_channel(self, channel_hash: bytes, normalized_name: str):
-        candidates = []
+    def _resolve_claim_in_channel(self, channel_hash: bytes, normalized_name: str, stream_claim_id: Optional[str] = None):
         for key, stream in self.prefix_db.channel_to_claim.iterate(prefix=(channel_hash, normalized_name)):
-            effective_amount = self.get_effective_amount(stream.claim_hash)
-            if not candidates or candidates[-1][-1] == effective_amount:
-                candidates.append((stream.claim_hash, key.tx_num, key.position, effective_amount))
-            else:
-                break
-        if not candidates:
-            return
-        return list(sorted(candidates, key=lambda item: item[1]))[0]
+            if stream_claim_id is not None and not stream.claim_hash.hex().startswith(stream_claim_id):
+                continue
+            return stream.claim_hash, key.tx_num, key.position, self.get_effective_amount(stream.claim_hash)
 
     def _resolve(self, url) -> ExpandedResolveResult:
         try:
@@ -308,7 +302,7 @@ class HubDB:
                 return ExpandedResolveResult(None, LookupError(f'Could not find channel in "{url}".'), None, None)
         if stream:
             if resolved_channel:
-                stream_claim = self._resolve_claim_in_channel(resolved_channel.claim_hash, stream.normalized)
+                stream_claim = self._resolve_claim_in_channel(resolved_channel.claim_hash, stream.normalized, stream.claim_id)
                 if stream_claim:
                     stream_claim_id, stream_tx_num, stream_tx_pos, effective_amount = stream_claim
                     resolved_stream = self._fs_get_claim_by_hash(stream_claim_id)
