@@ -83,7 +83,7 @@ class HubDB:
         self.tx_counts = None
         self.headers = None
         self.block_hashes = None
-        self.encoded_headers = LRUCacheWithMetrics(1 << 21, metric_name='encoded_headers', namespace=NAMESPACE)
+        self.encoded_headers = LRUCacheWithMetrics(1024, metric_name='encoded_headers', namespace=NAMESPACE)
         self.last_flush = time.time()
 
         # Header merkle cache
