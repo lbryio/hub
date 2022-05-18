@@ -53,22 +53,6 @@ class DB_PREFIXES(enum.Enum):
 COLUMN_SETTINGS = {}  # this is updated by the PrefixRow metaclass
 
 
-CLAIM_TYPES = {
-    'stream': 1,
-    'channel': 2,
-    'repost': 3,
-    'collection': 4,
-}
-
-STREAM_TYPES = {
-    'video': 1,
-    'audio': 2,
-    'image': 3,
-    'document': 4,
-    'binary': 5,
-    'model': 6,
-}
-
 # 9/21/2020
 MOST_USED_TAGS = {
     "gaming",

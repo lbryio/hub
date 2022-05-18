@@ -18,9 +18,9 @@ from hub.schema.url import URL, normalize_name
 from hub.schema.claim import guess_stream_type
 from hub.schema.result import Censor
 from hub.scribe.transaction import TxInput
-from hub.common import hash_to_hex_str, hash160, LRUCacheWithMetrics, sha256
+from hub.common import hash_to_hex_str, hash160, LRUCacheWithMetrics, sha256, STREAM_TYPES, CLAIM_TYPES
 from hub.db.merkle import Merkle, MerkleCache, FastMerkleCacheItem
-from hub.db.common import ResolveResult, STREAM_TYPES, CLAIM_TYPES, ExpandedResolveResult, DBError, UTXO
+from hub.db.common import ResolveResult,ExpandedResolveResult, DBError, UTXO
 from hub.db.prefixes import PendingActivationValue, ClaimTakeoverValue, ClaimToTXOValue, PrefixDB
 from hub.db.prefixes import ACTIVATED_CLAIM_TXO_TYPE, ACTIVATED_SUPPORT_TXO_TYPE, EffectiveAmountKey
 from hub.db.prefixes import PendingActivationKey, TXOToClaimValue, DBStatePrefixRow, MempoolTXPrefixRow

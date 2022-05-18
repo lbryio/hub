@@ -7,12 +7,10 @@ from elasticsearch import AsyncElasticsearch, NotFoundError
 from elasticsearch.helpers import async_streaming_bulk
 from hub.schema.result import Censor
 from hub.service import BlockchainReaderService
-from hub.common import IndexVersionMismatch
+from hub.common import IndexVersionMismatch, ALL_FIELDS, INDEX_DEFAULT_SETTINGS, expand_query
 from hub.db.revertable import RevertableOp
 from hub.db.common import TrendingNotification, DB_PREFIXES
 from hub.notifier_protocol import ElasticNotifierProtocol
-from hub.elastic_sync.search import expand_query
-from hub.elastic_sync.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
 from hub.elastic_sync.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
 if typing.TYPE_CHECKING:
     from hub.elastic_sync.env import ElasticEnv
