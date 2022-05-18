@@ -1,5 +1,5 @@
 import os
-from scribe import __name__, __version__
+from hub import __name__, __version__
 from setuptools import setup, find_packages
 
 BASE = os.path.dirname(__file__)

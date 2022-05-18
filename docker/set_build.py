@@ -2,7 +2,7 @@ import sys
 import os
 import re
 import logging
-import scribe.build_info as build_info_mod
+import hub.build_info as build_info_mod
 
 log = logging.getLogger()
 log.addHandler(logging.StreamHandler())
