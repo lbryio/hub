@@ -12,7 +12,7 @@ from hub.schema.result import Censor, Outputs
 from hub.schema.tags import clean_tags
 from hub.schema.url import normalize_name
 from hub.error import TooManyClaimSearchParametersError
-from hub.common import LRUCache
+from hub.common import LRUCache, IndexVersionMismatch
 from hub.db.common import CLAIM_TYPES, STREAM_TYPES
 from hub.elastic_sync.constants import INDEX_DEFAULT_SETTINGS, REPLACEMENTS, FIELDS, TEXT_FIELDS,  RANGE_FIELDS
 from hub.db.common import ResolveResult
@@ -30,12 +30,6 @@ class StreamResolution(str):
     @classmethod
     def lookup_error(cls, url):
         return LookupError(f'Could not find claim at "{url}".')
-
-
-class IndexVersionMismatch(Exception):
-    def __init__(self, got_version, expected_version):
-        self.got_version = got_version
-        self.expected_version = expected_version
 
 
 class SearchIndex:

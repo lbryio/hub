@@ -398,3 +398,9 @@ class TaskGroup:
             task.cancel()
         self.done.set()
         self.started.clear()
+
+
+class IndexVersionMismatch(Exception):
+    def __init__(self, got_version, expected_version):
+        self.got_version = got_version
+        self.expected_version = expected_version
