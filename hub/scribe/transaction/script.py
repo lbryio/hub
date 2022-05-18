@@ -1,6 +1,6 @@
 import typing
-from hub.blockchain.transaction import NameClaim, ClaimUpdate, ClaimSupport
-from hub.blockchain.transaction import unpack_le_uint16_from, unpack_le_uint32_from, pack_le_uint16, pack_le_uint32
+from hub.scribe.transaction import NameClaim, ClaimUpdate, ClaimSupport
+from hub.scribe.transaction import unpack_le_uint16_from, unpack_le_uint32_from, pack_le_uint16, pack_le_uint32
 
 
 class _OpCodes(typing.NamedTuple):

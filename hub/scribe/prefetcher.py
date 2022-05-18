@@ -2,8 +2,8 @@ import asyncio
 import logging
 import typing
 if typing.TYPE_CHECKING:
-    from hub.blockchain.network import LBCMainNet
-    from hub.blockchain.daemon import LBCDaemon
+    from hub.scribe.network import LBCMainNet
+    from hub.scribe.daemon import LBCDaemon
 
 
 def chunks(items, size):

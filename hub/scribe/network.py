@@ -7,9 +7,9 @@ from decimal import Decimal
 from hub.schema.base58 import Base58
 from hub.schema.bip32 import PublicKey
 from hub.common import hash160, hash_to_hex_str, double_sha256
-from hub.blockchain.transaction import TxOutput, TxInput, Block
-from hub.blockchain.transaction.deserializer import Deserializer
-from hub.blockchain.transaction.script import OpCodes, P2PKH_script, P2SH_script, txo_script_parser
+from hub.scribe.transaction import TxOutput, TxInput, Block
+from hub.scribe.transaction.deserializer import Deserializer
+from hub.scribe.transaction.script import OpCodes, P2PKH_script, P2SH_script, txo_script_parser
 
 
 HASHX_LEN = 11

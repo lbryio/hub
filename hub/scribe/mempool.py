@@ -2,7 +2,7 @@ import itertools
 import attr
 import typing
 from collections import defaultdict
-from hub.blockchain.transaction.deserializer import Deserializer
+from hub.scribe.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
     from hub.db import HubDB

@@ -9,7 +9,7 @@ import rocksdb.errors
 from hub import PROMETHEUS_NAMESPACE
 from hub.common import HISTOGRAM_BUCKETS
 from hub.db.common import UTXO
-from hub.blockchain.transaction.deserializer import Deserializer
+from hub.scribe.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
     from hub.hub.session import SessionManager

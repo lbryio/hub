@@ -3,8 +3,8 @@ import logging
 import traceback
 import argparse
 from hub.common import setup_logging
-from hub.blockchain.env import BlockchainEnv
-from hub.blockchain.service import BlockchainProcessorService
+from hub.scribe.env import BlockchainEnv
+from hub.scribe.service import BlockchainProcessorService
 
 
 def main():

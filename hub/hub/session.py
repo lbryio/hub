@@ -29,7 +29,7 @@ from hub.hub.framer import NewlineFramer
 if typing.TYPE_CHECKING:
     from hub.db import HubDB
     from hub.hub.env import ServerEnv
-    from hub.blockchain.daemon import LBCDaemon
+    from hub.scribe.daemon import LBCDaemon
     from hub.hub.mempool import HubMemPool
 
 BAD_REQUEST = 1

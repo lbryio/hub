@@ -12,14 +12,14 @@ from hub.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from hub.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
 from hub.error.base import ChainError
 from hub.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256, LRUCache
-from hub.blockchain.daemon import LBCDaemon
-from hub.blockchain.transaction import Tx, TxOutput, TxInput, Block
-from hub.blockchain.prefetcher import Prefetcher
-from hub.blockchain.mempool import MemPool
+from hub.scribe.daemon import LBCDaemon
+from hub.scribe.transaction import Tx, TxOutput, TxInput, Block
+from hub.scribe.prefetcher import Prefetcher
+from hub.scribe.mempool import MemPool
 from hub.schema.url import normalize_name
 from hub.service import BlockchainService
 if typing.TYPE_CHECKING:
-    from hub.blockchain.env import BlockchainEnv
+    from hub.scribe.env import BlockchainEnv
     from hub.db.revertable import RevertableOpStack
 
 

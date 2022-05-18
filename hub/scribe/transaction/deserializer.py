@@ -1,9 +1,9 @@
 from hub.common import double_sha256
-from hub.blockchain.transaction import (
+from hub.scribe.transaction import (
     unpack_le_int32_from, unpack_le_int64_from, unpack_le_uint16_from,
     unpack_le_uint32_from, unpack_le_uint64_from, Tx, TxInput, TxOutput
 )
-from hub.blockchain.transaction.script import txo_script_parser
+from hub.scribe.transaction.script import txo_script_parser
 
 
 class Deserializer:

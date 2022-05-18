@@ -1,7 +1,7 @@
 import time
 import typing
 import asyncio
-from hub.blockchain.daemon import LBCDaemon
+from hub.scribe.daemon import LBCDaemon
 from hub.hub.session import SessionManager
 from hub.hub.mempool import HubMemPool
 from hub.hub.udp import StatusServer

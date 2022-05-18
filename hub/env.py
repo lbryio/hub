@@ -3,7 +3,7 @@ import re
 import resource
 import logging
 from collections import namedtuple
-from hub.blockchain.network import LBCMainNet, LBCTestNet, LBCRegTest
+from hub.scribe.network import LBCMainNet, LBCTestNet, LBCRegTest
 
 
 NetIdentity = namedtuple('NetIdentity', 'host tcp_port ssl_port nick_suffix')

@@ -17,7 +17,7 @@ from hub.error import ResolveCensoredError
 from hub.schema.url import URL, normalize_name
 from hub.schema.claim import guess_stream_type
 from hub.schema.result import Censor
-from hub.blockchain.transaction import TxInput
+from hub.scribe.transaction import TxInput
 from hub.common import hash_to_hex_str, hash160, LRUCacheWithMetrics, sha256
 from hub.db.merkle import Merkle, MerkleCache, FastMerkleCacheItem
 from hub.db.common import ResolveResult, STREAM_TYPES, CLAIM_TYPES, ExpandedResolveResult, DBError, UTXO
