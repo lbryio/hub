@@ -47,7 +47,7 @@ STREAM_TYPES = {
 
 
 def setup_logging(log_path: str):
-    log = logging.getLogger('scribe')
+    log = logging.getLogger()
     fmt = logging.Formatter("%(asctime)s %(levelname)-4s %(name)s:%(lineno)d: %(message)s")
     handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=1024*1024*5, backupCount=2)
     handler.setFormatter(fmt)
