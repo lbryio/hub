@@ -1,8 +1,8 @@
 import unittest
 import tempfile
 import shutil
-from scribe.db.revertable import RevertableOpStack, RevertableDelete, RevertablePut, OpStackIntegrity
-from scribe.db.prefixes import ClaimToTXOPrefixRow, PrefixDB
+from hub.db.revertable import RevertableOpStack, RevertableDelete, RevertablePut, OpStackIntegrity
+from hub.db.prefixes import ClaimToTXOPrefixRow, PrefixDB
 
 
 class TestRevertableOpStack(unittest.TestCase):

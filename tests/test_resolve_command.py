@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import NamedTuple, List
 from lbry.testcase import CommandTestCase
 from lbry.wallet.transaction import Transaction, Output
-from scribe.schema.compat import OldClaimMessage
+from hub.schema.compat import OldClaimMessage
 from lbry.crypto.hash import sha256
 from lbry.crypto.base58 import Base58
 

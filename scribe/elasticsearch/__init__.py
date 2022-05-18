@@ -1,2 +1,0 @@
-from scribe.elasticsearch.search import SearchIndex
-from scribe.elasticsearch.notifier_protocol import ElasticNotifierClientProtocol

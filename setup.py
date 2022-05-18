@@ -1,5 +1,5 @@
 import os
-from scribe import __name__, __version__
+from hub import __name__, __version__
 from setuptools import setup, find_packages
 
 BASE = os.path.dirname(__file__)
@@ -23,9 +23,9 @@ setup(
     zip_safe=False,
     entry_points={
         'console_scripts': [
-            'scribe=scribe.blockchain.__main__:main',
-            'scribe-hub=scribe.hub.__main__:main',
-            'scribe-elastic-sync=scribe.elasticsearch.__main__:main',
+            'scribe=hub.scribe.__main__:main',
+            'herald=hub.herald.__main__:main',
+            'scribe-elastic-sync=hub.elastic_sync.__main__:main',
         ],
     },
     install_requires=[
