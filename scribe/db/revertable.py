@@ -2,7 +2,7 @@ import struct
 import logging
 from string import printable
 from collections import defaultdict
-from typing import Tuple, Iterable, Callable, Optional
+from typing import Tuple, Iterable, Callable, Optional, List
 from scribe.db.common import DB_PREFIXES
 
 _OP_STRUCT = struct.Struct('>BLL')
@@ -82,7 +82,8 @@ class OpStackIntegrity(Exception):
 
 
 class RevertableOpStack:
-    def __init__(self, get_fn: Callable[[bytes], Optional[bytes]], unsafe_prefixes=None):
+    def __init__(self, get_fn: Callable[[bytes], Optional[bytes]],
+                 multi_get_fn: Callable[[List[bytes]], Iterable[Optional[bytes]]], unsafe_prefixes=None):
         """
         This represents a sequence of revertable puts and deletes to a key-value database that checks for integrity
         violations when applying the puts and deletes. The integrity checks assure that keys that do not exist
@@ -95,6 +96,7 @@ class RevertableOpStack:
         :param unsafe_prefixes: optional set of prefixes to ignore integrity errors for, violations are still logged
         """
         self._get = get_fn
+        self._multi_get = multi_get_fn
         self._items = defaultdict(list)
         self._unsafe_prefixes = unsafe_prefixes or set()
 
@@ -132,6 +134,88 @@ class RevertableOpStack:
             else:
                 raise err
         self._items[op.key].append(op)
+
+    def multi_put(self, ops: List[RevertablePut]):
+        """
+        Apply a put or delete op, checking that it introduces no integrity errors
+        """
+
+        if not ops:
+            return
+
+        need_put = []
+
+        if not all(op.is_put for op in ops):
+            raise ValueError(f"list must contain only puts")
+        if not len(set(map(lambda op: op.key, ops))) == len(ops):
+            raise ValueError(f"list must contain unique keys")
+
+        for op in ops:
+            if self._items[op.key] and op.invert() == self._items[op.key][-1]:
+                self._items[op.key].pop()  # if the new op is the inverse of the last op, we can safely null both
+                continue
+            elif self._items[op.key] and self._items[op.key][-1] == op:  # duplicate of last op
+                continue  # raise an error?
+            else:
+                need_put.append(op)
+
+        for op, stored_val in zip(need_put, self._multi_get(list(map(lambda item: item.key, need_put)))):
+            has_stored_val = stored_val is not None
+            delete_stored_op = None if not has_stored_val else RevertableDelete(op.key, stored_val)
+            will_delete_existing_stored = False if delete_stored_op is None else (delete_stored_op in self._items[op.key])
+            try:
+                if has_stored_val and not will_delete_existing_stored:
+                    raise OpStackIntegrity(f"db op tries to overwrite before deleting existing: {op}")
+            except OpStackIntegrity as err:
+                if op.key[:1] in self._unsafe_prefixes:
+                    log.debug(f"skipping over integrity error: {err}")
+                else:
+                    raise err
+            self._items[op.key].append(op)
+
+    def multi_delete(self, ops: List[RevertableDelete]):
+        """
+        Apply a put or delete op, checking that it introduces no integrity errors
+        """
+
+        if not ops:
+            return
+
+        need_delete = []
+
+        if not all(op.is_delete for op in ops):
+            raise ValueError(f"list must contain only deletes")
+        if not len(set(map(lambda op: op.key, ops))) == len(ops):
+            raise ValueError(f"list must contain unique keys")
+
+        for op in ops:
+            if self._items[op.key] and op.invert() == self._items[op.key][-1]:
+                self._items[op.key].pop()  # if the new op is the inverse of the last op, we can safely null both
+                continue
+            elif self._items[op.key] and self._items[op.key][-1] == op:  # duplicate of last op
+                continue  # raise an error?
+            else:
+                need_delete.append(op)
+
+        for op, stored_val in zip(need_delete, self._multi_get(list(map(lambda item: item.key, need_delete)))):
+            has_stored_val = stored_val is not None
+            delete_stored_op = None if not has_stored_val else RevertableDelete(op.key, stored_val)
+            will_delete_existing_stored = False if delete_stored_op is None else (delete_stored_op in self._items[op.key])
+            try:
+                if op.is_delete and has_stored_val and stored_val != op.value and not will_delete_existing_stored:
+                    # there is a value and we're not deleting it in this op
+                    # check that a delete for the stored value is in the stack
+                    raise OpStackIntegrity(f"db op tries to delete with incorrect existing value {op}")
+                elif not stored_val:
+                    raise OpStackIntegrity(f"db op tries to delete nonexistent key: {op}")
+                elif op.is_delete and stored_val != op.value:
+                    raise OpStackIntegrity(f"db op tries to delete with incorrect value: {op}")
+            except OpStackIntegrity as err:
+                if op.key[:1] in self._unsafe_prefixes:
+                    log.debug(f"skipping over integrity error: {err}")
+                else:
+                    raise err
+            self._items[op.key].append(op)
 
     def extend_ops(self, ops: Iterable[RevertableOp]):
         """
