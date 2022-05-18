@@ -28,7 +28,7 @@ RUN groupadd -g 999 $user && useradd -m -u 999 -g $user $user
 RUN mkdir -p $db_dir
 RUN chown -R $user:$user $db_dir
 
-COPY docker $projects_dir
+COPY . $projects_dir
 RUN chown -R $user:$user $projects_dir
 
 USER $user
