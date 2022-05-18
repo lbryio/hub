@@ -14,7 +14,7 @@ from hub.schema.url import normalize_name
 from hub.error import TooManyClaimSearchParametersError
 from hub.common import LRUCache
 from hub.db.common import CLAIM_TYPES, STREAM_TYPES
-from hub.elasticsearch.constants import INDEX_DEFAULT_SETTINGS, REPLACEMENTS, FIELDS, TEXT_FIELDS,  RANGE_FIELDS
+from hub.elastic_sync.constants import INDEX_DEFAULT_SETTINGS, REPLACEMENTS, FIELDS, TEXT_FIELDS,  RANGE_FIELDS
 from hub.db.common import ResolveResult
 if TYPE_CHECKING:
     from hub.db import HubDB

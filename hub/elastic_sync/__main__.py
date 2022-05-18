@@ -3,8 +3,8 @@ import logging
 import traceback
 import argparse
 from hub.common import setup_logging
-from hub.elasticsearch.env import ElasticEnv
-from hub.elasticsearch.service import ElasticSyncService
+from hub.elastic_sync.env import ElasticEnv
+from hub.elastic_sync.service import ElasticSyncService
 
 
 def main():

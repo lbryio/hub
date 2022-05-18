@@ -9,12 +9,12 @@ from hub.schema.result import Censor
 from hub.service import BlockchainReaderService
 from hub.db.revertable import RevertableOp
 from hub.db.common import TrendingNotification, DB_PREFIXES
-from hub.elasticsearch.notifier_protocol import ElasticNotifierProtocol
-from hub.elasticsearch.search import IndexVersionMismatch, expand_query
-from hub.elasticsearch.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
-from hub.elasticsearch.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
+from hub.elastic_sync.notifier_protocol import ElasticNotifierProtocol
+from hub.elastic_sync.search import IndexVersionMismatch, expand_query
+from hub.elastic_sync.constants import ALL_FIELDS, INDEX_DEFAULT_SETTINGS
+from hub.elastic_sync.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
 if typing.TYPE_CHECKING:
-    from hub.elasticsearch.env import ElasticEnv
+    from hub.elastic_sync.env import ElasticEnv
 
 
 class ElasticSyncService(BlockchainReaderService):

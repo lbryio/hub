@@ -6,7 +6,7 @@ from hub.herald.session import SessionManager
 from hub.herald.mempool import HubMemPool
 from hub.herald.udp import StatusServer
 from hub.service import BlockchainReaderService
-from hub.elasticsearch import ElasticNotifierClientProtocol
+from hub.elastic_sync import ElasticNotifierClientProtocol
 if typing.TYPE_CHECKING:
     from hub.herald.env import ServerEnv
 

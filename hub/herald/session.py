@@ -20,7 +20,7 @@ from hub.error import ResolveCensoredError, TooManyClaimSearchParametersError
 from hub import __version__, PROMETHEUS_NAMESPACE
 from hub.herald import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
 from hub.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
-from hub.elasticsearch import SearchIndex
+from hub.elastic_sync import SearchIndex
 from hub.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
 from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS
 from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
