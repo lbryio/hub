@@ -1,33 +1,33 @@
-## Scribe
+## LBRY Hub
 
-Scribe is a python library for building services that use the processed data from the [LBRY blockchain](https://github.com/lbryio/lbrycrd) in an ongoing manner. Scribe contains a set of three core executable services that are used together:
- * `scribe` ([scribe.blockchain.service](https://github.com/lbryio/scribe/tree/master/scribe/blockchain/service.py)) - maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the LBRY blockchain.
- * `scribe-hub` ([scribe.hub.service](https://github.com/lbryio/scribe/tree/master/scribe/hub/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryio/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain.
- * `scribe-elastic-sync` ([scribe.elasticsearch.service](https://github.com/lbryio/scribe/tree/master/scribe/elasticsearch/service.py)) - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
+This repo provides a python library, `hub`, for building services that use the processed data from the [LBRY blockchain](https://github.com/lbryio/lbrycrd) in an ongoing manner. Hub contains a set of three core executable services that are used together:
+ * `scribe` ([hub.scribe.service](https://github.com/lbryio/lbry-hub/tree/master/hub/service.py)) - maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the LBRY blockchain.
+ * `herald` ([hub.herald.service](https://github.com/lbryio/lbry-hub/tree/master/hub/herald/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryio/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain.
+ * `scribe-elastic-sync` ([hub.elastic_sync.service](https://github.com/lbryio/lbry-hub/tree/master/hub/elastic_sync/service.py)) - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
 
-Features and overview of scribe as a python library:
+Features and overview of `hub` as a python library:
  * Uses Python 3.7-3.9 (3.10 probably works but hasn't yet been tested)
- * An interface developers may implement in order to build their own applications able to receive up-to-date blockchain data in an ongoing manner ([scribe.service.BlockchainReaderService](https://github.com/lbryio/scribe/tree/master/scribe/service.py))
- * Protobuf schema for encoding and decoding metadata stored on the blockchain ([scribe.schema](https://github.com/lbryio/scribe/tree/master/scribe/schema))
- * [Rocksdb 6.25.3](https://github.com/lbryio/lbry-rocksdb/) based database containing the blockchain data ([scribe.db](https://github.com/lbryio/scribe/tree/master/scribe/db))
- * [A community driven performant trending algorithm](https://raw.githubusercontent.com/lbryio/scribe/master/scribe/elasticsearch/trending%20algorithm.pdf) for searching claims ([code](https://github.com/lbryio/scribe/blob/master/scribe/elasticsearch/fast_ar_trending.py))
+ * An interface developers may implement in order to build their own applications able to receive up-to-date blockchain data in an ongoing manner ([hub.service.BlockchainReaderService](https://github.com/lbryio/lbry-hub/tree/master/hub/service.py))
+ * Protobuf schema for encoding and decoding metadata stored on the blockchain ([hub.schema](https://github.com/lbryio/lbry-hub/tree/master/hub/schema))
+ * [Rocksdb 6.25.3](https://github.com/lbryio/lbry-rocksdb/) based database containing the blockchain data ([hub.db](https://github.com/lbryio/lbry-hub/tree/master/hub/db))
+ * [A community driven performant trending algorithm](https://raw.githubusercontent.com/lbryio/lbry-hub/master/docs/trending%20algorithm.pdf) for searching claims ([code](https://github.com/lbryio/lbry-hub/blob/master/hub/elastic_sync/fast_ar_trending.py))
 
 ## Installation
 
 Scribe may be run from source, a binary, or a docker image.
-Our [releases page](https://github.com/lbryio/scribe/releases) contains pre-built binaries of the latest release, pre-releases, and past releases for macOS and Debian-based Linux.
-Prebuilt [docker images](https://hub.docker.com/r/lbry/scribe/latest-release) are also available.
+Our [releases page](https://github.com/lbryio/lbry-hub/releases) contains pre-built binaries of the latest release, pre-releases, and past releases for macOS and Debian-based Linux.
+Prebuilt [docker images](https://hub.docker.com/r/lbry/lbry-hub/latest-release) are also available.
 
 ### Prebuilt docker image
 
-`docker pull lbry/scribe:latest-release`
+`docker pull lbry/lbry-hub:latest-release`
 
 ### Build your own docker image
 
 ```
-git clone https://github.com/lbryio/scribe.git
-cd scribe
-docker build -f ./docker/Dockerfile.scribe -t lbry/scribe:development .
+git clone https://github.com/lbryio/lbry-hub.git
+cd lbry-hub
+docker build -t lbry/lbry-hub:development .
 ```
 
 ### Install from source
@@ -36,22 +36,22 @@ Scribe has been tested with python 3.7-3.9. Higher versions probably work but ha
 
 1. clone the scribe repo
 ```
-git clone https://github.com/lbryio/scribe.git
-cd scribe
+git clone https://github.com/lbryio/lbry-hub.git
+cd lbry-hub
 ```
 2. make a virtual env
 ```
-python3.9 -m venv scribe-venv
+python3.9 -m venv lbry-hub-venv
 ```
 3. from the virtual env, install scribe
 ```
-source scribe-venv/bin/activate
+source lbry-hub-venv/bin/activate
 pip install -e .
 ```
 
-That completes the installation, now you should have the commands `scribe`, `scribe-elastic-sync` and `scribe-hub`
+That completes the installation, now you should have the commands `scribe`, `scribe-elastic-sync` and `herald`
 
-These can also optionally be run with `python -m scribe.blockchain`, `python -m scribe.elasticsearch`, and `python -m scribe.hub`
+These can also optionally be run with `python -m hub.scribe`, `python -m hub.elastic_sync`, and `python -m hub.herald`
 
 ## Usage
 
@@ -76,13 +76,13 @@ If you have the resources to run all of the services on one machine (at least 30
 
 For various reasons it may be desirable to block or filtering content from claim search and resolve results, [here](https://github.com/lbryio/scribe/blob/master/blocking.md) are instructions for how to configure and use this feature as well as information about the recommended defaults.
 
-#### Common options across `scribe`, `scribe-hub`, and `scribe-elastic-sync`:
+#### Common options across `scribe`, `herald`, and `scribe-elastic-sync`:
   - `--db_dir` (required) Path of the directory containing lbry-rocksdb, set from the environment with `DB_DIRECTORY`
-  - `--daemon_url` (required for `scribe` and `scribe-hub`) URL for rpc from lbrycrd or lbcd<rpcuser>:<rpcpassword>@<lbrycrd rpc ip><lbrycrd rpc port>.
+  - `--daemon_url` (required for `scribe` and `herald`) URL for rpc from lbrycrd or lbcd<rpcuser>:<rpcpassword>@<lbrycrd rpc ip><lbrycrd rpc port>.
   - `--reorg_limit` Max reorg depth, defaults to 200, set from the environment with `REORG_LIMIT`.
   - `--chain` With blockchain to use - either `mainnet`, `testnet`, or `regtest` - set from the environment with `NET`
   - `--max_query_workers` Size of the thread pool, set from the environment with `MAX_QUERY_WORKERS`
-  - `--cache_all_tx_hashes` If this flag is set, all tx hashes will be stored in memory. For `scribe`, this speeds up the rate it can apply blocks as well as process mempool. For `scribe-hub`, this will speed up syncing address histories. This setting will use 10+g of memory. It can be set from the environment with `CACHE_ALL_TX_HASHES=Yes`
+  - `--cache_all_tx_hashes` If this flag is set, all tx hashes will be stored in memory. For `scribe`, this speeds up the rate it can apply blocks as well as process mempool. For `herald`, this will speed up syncing address histories. This setting will use 10+g of memory. It can be set from the environment with `CACHE_ALL_TX_HASHES=Yes`
   - `--cache_all_claim_txos` If this flag is set, all claim txos will be indexed in memory. Set from the environment with `CACHE_ALL_CLAIM_TXOS=Yes`
   - `--prometheus_port` If provided this port will be used to provide prometheus metrics, set from the environment with `PROMETHEUS_PORT`
 
@@ -94,7 +94,7 @@ For various reasons it may be desirable to block or filtering content from claim
 #### Options for `scribe-elastic-sync`
   - `--reindex` If this flag is set drop and rebuild the elasticsearch index.
 
-#### Options for `scribe-hub`
+#### Options for `herald`
   - `--host` Interface for server to listen on, use 0.0.0.0 to listen on the external interface. Can be set from the environment with `HOST`
   - `--tcp_port` Electrum TCP port to listen on for hub server. Can be set from the environment with `TCP_PORT`
   - `--udp_port` UDP port to listen on for hub server. Can be set from the environment with `UDP_PORT`
