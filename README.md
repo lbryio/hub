@@ -64,9 +64,9 @@ With options for high performance, if you have 64gb of memory and 12 cores, ever
 As of block 1147423 (4/21/22) the size of the scribe rocksdb database is 120GB and the size of the elasticsearch volume is 63GB.
 
 ### docker-compose
-The recommended way to run a scribe hub is with docker. See [this guide](https://github.com/lbryio/scribe/blob/master/cluster_guide.md) for instructions.
+The recommended way to run a scribe hub is with docker. See [this guide](https://github.com/lbryio/lbry-hub/blob/master/docs/cluster_guide.md) for instructions.
 
-If you have the resources to run all of the services on one machine (at least 300gb of fast storage, preferably nvme, 64gb of RAM, 12 fast cores), see [this](https://github.com/lbryio/scribe/blob/master/docker/docker-compose.yml) docker-compose example.
+If you have the resources to run all of the services on one machine (at least 300gb of fast storage, preferably nvme, 64gb of RAM, 12 fast cores), see [this](https://github.com/lbryio/lbry-hub/blob/master/docs/docker_examples/docker-compose.yml) docker-compose example.
 
 ### From source
 
@@ -74,7 +74,7 @@ If you have the resources to run all of the services on one machine (at least 30
 
 #### Content blocking and filtering
 
-For various reasons it may be desirable to block or filtering content from claim search and resolve results, [here](https://github.com/lbryio/scribe/blob/master/blocking.md) are instructions for how to configure and use this feature as well as information about the recommended defaults.
+For various reasons it may be desirable to block or filtering content from claim search and resolve results, [here](https://github.com/lbryio/lbry-hub/blob/master/docs/blocking.md) are instructions for how to configure and use this feature as well as information about the recommended defaults.
 
 #### Common options across `scribe`, `herald`, and `scribe-elastic-sync`:
   - `--db_dir` (required) Path of the directory containing lbry-rocksdb, set from the environment with `DB_DIRECTORY`
