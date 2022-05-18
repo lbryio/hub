@@ -55,8 +55,8 @@ services:
     volumes:
       - "lbry_rocksdb:/database"
     environment:
-      - HUB_COMMAND=scribe-hub
-    command:  # for full options, see `scribe-hub --help`
+      - HUB_COMMAND=herald
+    command:  # for full options, see `herald --help`
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=4"
       - "--host=0.0.0.0"

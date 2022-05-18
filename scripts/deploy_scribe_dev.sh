@@ -7,7 +7,7 @@ SCRIPTS_DIR=`dirname $0`
 SCRIBE_DIR=`dirname $SCRIPTS_DIR`
 
 # build the image
-docker build -f $SCRIBE_DIR/docker/Dockerfile -t lbry/scribe:development $SCRIBE_DIR
+docker build -f $SCRIBE_DIR/Dockerfile -t lbry/scribe:development $SCRIBE_DIR
 IMAGE=`docker image inspect lbry/scribe:development | sed -n "s/^.*Id\":\s*\"sha256:\s*\(\S*\)\".*$/\1/p"`
 
 # push the image to the server
