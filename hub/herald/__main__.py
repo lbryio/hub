@@ -3,8 +3,8 @@ import logging
 import traceback
 import argparse
 from hub.common import setup_logging
-from hub.hub.env import ServerEnv
-from hub.hub.service import HubServerService
+from hub.herald.env import ServerEnv
+from hub.herald.service import HubServerService
 
 
 def main():

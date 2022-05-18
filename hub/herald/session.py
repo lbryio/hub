@@ -18,19 +18,19 @@ from prometheus_client import Counter, Info, Histogram, Gauge
 from hub.schema.result import Outputs
 from hub.error import ResolveCensoredError, TooManyClaimSearchParametersError
 from hub import __version__, PROMETHEUS_NAMESPACE
-from hub.hub import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
+from hub.herald import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
 from hub.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from hub.elasticsearch import SearchIndex
 from hub.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
 from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS
-from hub.hub.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
-from hub.hub.common import BatchRequest, ProtocolError, Request, Batch, Notification
-from hub.hub.framer import NewlineFramer
+from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
+from hub.herald.common import BatchRequest, ProtocolError, Request, Batch, Notification
+from hub.herald.framer import NewlineFramer
 if typing.TYPE_CHECKING:
     from hub.db import HubDB
-    from hub.hub.env import ServerEnv
+    from hub.herald.env import ServerEnv
     from hub.scribe.daemon import LBCDaemon
-    from hub.hub.mempool import HubMemPool
+    from hub.herald.mempool import HubMemPool
 
 BAD_REQUEST = 1
 DAEMON_ERROR = 2

@@ -12,7 +12,7 @@ from hub.db.common import UTXO
 from hub.scribe.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
-    from hub.hub.session import SessionManager
+    from hub.herald.session import SessionManager
     from hub.db import HubDB
 
 

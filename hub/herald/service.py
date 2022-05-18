@@ -2,13 +2,13 @@ import time
 import typing
 import asyncio
 from hub.scribe.daemon import LBCDaemon
-from hub.hub.session import SessionManager
-from hub.hub.mempool import HubMemPool
-from hub.hub.udp import StatusServer
+from hub.herald.session import SessionManager
+from hub.herald.mempool import HubMemPool
+from hub.herald.udp import StatusServer
 from hub.service import BlockchainReaderService
 from hub.elasticsearch import ElasticNotifierClientProtocol
 if typing.TYPE_CHECKING:
-    from hub.hub.env import ServerEnv
+    from hub.herald.env import ServerEnv
 
 
 class HubServerService(BlockchainReaderService):

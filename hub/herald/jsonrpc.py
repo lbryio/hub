@@ -7,7 +7,7 @@ from asyncio import Event
 from functools import partial
 from numbers import Number
 from hub.common import RPCError, CodeMessageError
-from hub.hub.common import Notification, Request, Response, Batch, ProtocolError
+from hub.herald.common import Notification, Request, Response, Batch, ProtocolError
 
 
 class JSONRPC:
