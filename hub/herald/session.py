@@ -22,7 +22,7 @@ from hub.herald import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
 from hub.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from hub.herald.search import SearchIndex
 from hub.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
-from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS
+from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS, LRUCache
 from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
 from hub.herald.common import BatchRequest, ProtocolError, Request, Batch, Notification
 from hub.herald.framer import NewlineFramer
@@ -183,7 +183,6 @@ class SessionManager:
         self.cur_group = SessionGroup(0)
         self.txs_sent = 0
         self.start_time = time.time()
-        self.history_cache = {}
         self.resolve_outputs_cache = {}
         self.resolve_cache = {}
         self.notified_height: typing.Optional[int] = None
@@ -198,9 +197,13 @@ class SessionManager:
             elastic_host=env.elastic_host, elastic_port=env.elastic_port
         )
         self.running = False
+        self.hashX_history_cache = LRUCache(2 ** 14)
+        self.hashX_full_cache = LRUCache(2 ** 12)
+        self.history_tx_info_cache = LRUCache(2 ** 17)
 
     def clear_caches(self):
-        self.history_cache.clear()
+        self.hashX_history_cache.clear()
+        self.hashX_full_cache.clear()
         self.resolve_outputs_cache.clear()
         self.resolve_cache.clear()
 
@@ -592,16 +595,36 @@ class SessionManager:
         self.txs_sent += 1
         return hex_hash
 
-    async def limited_history(self, hashX):
-        """A caching layer."""
-        if hashX not in self.history_cache:
-            # History DoS limit.  Each element of history is about 99
-            # bytes when encoded as JSON.  This limits resource usage
-            # on bloated history requests, and uses a smaller divisor
-            # so large requests are logged before refusing them.
+    async def limited_history(self, hashX: bytes) -> typing.List[typing.Tuple[str, int]]:
+        if hashX in self.hashX_full_cache:
+            return self.hashX_full_cache[hashX]
+        if hashX not in self.hashX_history_cache:
             limit = self.env.max_send // 97
-            self.history_cache[hashX] = await self.db.limited_history(hashX, limit=limit)
-        return self.history_cache[hashX]
+            self.hashX_history_cache[hashX] = tx_nums = await self.db.read_history(hashX, limit)
+        else:
+            tx_nums = self.hashX_history_cache[hashX]
+        needed_tx_infos = []
+        append_needed_tx_info = needed_tx_infos.append
+        tx_infos = {}
+        for tx_num in tx_nums:
+            if tx_num in self.history_tx_info_cache:
+                tx_infos[tx_num] = self.history_tx_info_cache[tx_num]
+            else:
+                append_needed_tx_info(tx_num)
+            await asyncio.sleep(0)
+        if needed_tx_infos:
+
+            for tx_num, tx_hash in zip(needed_tx_infos, await self.db.get_tx_hashes(needed_tx_infos)):
+                hist = tx_hash[::-1].hex(), bisect_right(self.db.tx_counts, tx_num)
+                tx_infos[tx_num] = self.history_tx_info_cache[tx_num] = hist
+                await asyncio.sleep(0)
+        history = []
+        history_append = history.append
+        for tx_num in tx_nums:
+            history_append(tx_infos[tx_num])
+            await asyncio.sleep(0)
+        self.hashX_full_cache[hashX] = history
+        return history
 
     def _notify_peer(self, peer):
         notify_tasks = [
@@ -1419,8 +1442,8 @@ class LBRYElectrumX(asyncio.Protocol):
     async def confirmed_and_unconfirmed_history(self, hashX):
         # Note history is ordered but unconfirmed is unordered in e-s
         history = await self.session_manager.limited_history(hashX)
-        conf = [{'tx_hash': hash_to_hex_str(tx_hash), 'height': height}
-                for tx_hash, height in history]
+        conf = [{'tx_hash': txid, 'height': height}
+                for txid, height in history]
         return conf + self.unconfirmed_history(hashX)
 
     async def scripthash_get_history(self, scripthash):

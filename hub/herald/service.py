@@ -48,6 +48,24 @@ class HubServerService(BlockchainReaderService):
         touched_hashXs = self.db.prefix_db.touched_hashX.get(height).touched_hashXs
         self.notifications_to_send.append((set(touched_hashXs), height))
 
+    def unwind(self):
+        prev_count = self.db.tx_counts.pop()
+        tx_count = self.db.tx_counts[-1]
+        self.db.headers.pop()
+        self.db.block_hashes.pop()
+        current_count = prev_count
+        for _ in range(prev_count - tx_count):
+            if current_count in self.session_manager.history_tx_info_cache:
+                self.session_manager.history_tx_info_cache.pop(current_count)
+            current_count -= 1
+        if self.db._cache_all_tx_hashes:
+            for _ in range(prev_count - tx_count):
+                tx_hash = self.db.tx_num_mapping.pop(self.db.total_transactions.pop())
+                if tx_hash in self.db.tx_cache:
+                    self.db.tx_cache.pop(tx_hash)
+            assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
+        self.db.merkle_cache.clear()
+
     def _detect_changes(self):
         super()._detect_changes()
         start = time.perf_counter()
