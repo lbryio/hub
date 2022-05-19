@@ -22,7 +22,7 @@ from hub.herald import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
 from hub.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from hub.herald.search import SearchIndex
 from hub.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time
-from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS, LRUCache
+from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS, LRUCache, LRUCacheWithMetrics
 from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
 from hub.herald.common import BatchRequest, ProtocolError, Request, Batch, Notification
 from hub.herald.framer import NewlineFramer
@@ -199,7 +199,7 @@ class SessionManager:
         self.running = False
         self.hashX_history_cache = LRUCache(2 ** 14)
         self.hashX_full_cache = LRUCache(2 ** 12)
-        self.history_tx_info_cache = LRUCache(2 ** 17)
+        self.history_tx_info_cache = LRUCacheWithMetrics(2 ** 18, metric_name='history_tx', namespace=NAMESPACE)
 
     def clear_caches(self):
         self.hashX_history_cache.clear()
@@ -607,8 +607,9 @@ class SessionManager:
         append_needed_tx_info = needed_tx_infos.append
         tx_infos = {}
         for tx_num in tx_nums:
-            if tx_num in self.history_tx_info_cache:
-                tx_infos[tx_num] = self.history_tx_info_cache[tx_num]
+            cached = self.history_tx_info_cache.get(tx_num)
+            if cached is not None:
+                tx_infos[tx_num] = cached
             else:
                 append_needed_tx_info(tx_num)
             await asyncio.sleep(0)
