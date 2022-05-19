@@ -829,8 +829,6 @@ class HubDB:
         # read db state
         self.read_db_state()
 
-        self.logger.info("index address statuses: %s", self._index_address_status)
-
         # These are our state as we move ahead of DB state
         self.fs_height = self.db_height
         self.fs_tx_count = self.db_tx_count
@@ -843,6 +841,14 @@ class HubDB:
         self.logger.info(f'height: {self.db_height:,d}')
         self.logger.info(f'tip: {hash_to_hex_str(self.db_tip)}')
         self.logger.info(f'tx count: {self.db_tx_count:,d}')
+        if self.last_indexed_address_status_height:
+            self.logger.info(f'last indexed address statuses at block {self.last_indexed_address_status_height}')
+        self.logger.info(f'using address status index: {self._index_address_status}')
+        if self.filtering_channel_hashes:
+            self.logger.info("filtering claims reposted by channels: %s", ', '.join(map(lambda x: x.hex(), self.filtering_channel_hashes)))
+        if self.blocking_channel_hashes:
+            self.logger.info("blocking claims reposted by channels: %s",
+                             ', '.join(map(lambda x: x.hex(), self.blocking_channel_hashes)))
         if self.hist_db_version not in self.DB_VERSIONS:
             msg = f'this software only handles DB versions {self.DB_VERSIONS}'
             self.logger.error(msg)

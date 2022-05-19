@@ -16,10 +16,6 @@ class ElasticEnv(Env):
             'ELASTIC_NOTIFIER_PORT', 19080)
         self.es_index_prefix = es_index_prefix if es_index_prefix is not None else self.default('ES_INDEX_PREFIX', '')
         # Filtering / Blocking
-        self.blocking_channel_ids = blocking_channel_ids if blocking_channel_ids is not None else self.default(
-            'BLOCKING_CHANNEL_IDS', '').split(' ')
-        self.filtering_channel_ids = filtering_channel_ids if filtering_channel_ids is not None else self.default(
-            'FILTERING_CHANNEL_IDS', '').split(' ')
         self.reindex = reindex if reindex is not None else self.boolean('REINDEX_ES', False)
 
     @classmethod

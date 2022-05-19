@@ -10,7 +10,7 @@ services:
     depends_on:
       - lbcd
       - scribe_elastic_sync
-    image: lbry/scribe:${SCRIBE_TAG:-latest}
+    image: lbry/hub:${SCRIBE_TAG:-latest}
     restart: always
     network_mode: host
     volumes:
@@ -24,7 +24,7 @@ services:
   scribe_elastic_sync:
     depends_on:
       - es01
-    image: lbry/scribe:${SCRIBE_TAG:-latest}
+    image: lbry/hub:${SCRIBE_TAG:-latest}
     restart: always
     network_mode: host
     ports:
@@ -33,10 +33,10 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe-elastic-sync
+      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
+      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
     command:  # for full options, see `scribe-elastic-sync --help`
       - "--max_query_workers=2"
-      - "--filtering_channel_ids=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8"
-      - "--blocking_channel_ids=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6"
       - "--elastic_host=127.0.0.1"            # elasticsearch host
       - "--elastic_port=9200"                 # elasticsearch port
       - "--elastic_notifier_host=127.0.0.1"   # address for the elastic sync notifier to connect to
@@ -46,7 +46,7 @@ services:
       - lbcd
       - scribe_elastic_sync
       - scribe
-    image: lbry/scribe:${SCRIBE_TAG:-latest}
+    image: lbry/hub:${SCRIBE_TAG:-latest}
     restart: always
     network_mode: host
     ports:
@@ -56,12 +56,12 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=herald
+      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
+      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
     command:  # for full options, see `herald --help`
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=4"
       - "--host=0.0.0.0"
-      - "--filtering_channel_ids=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8"
-      - "--blocking_channel_ids=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6"
       - "--prometheus_port=2112"              # comment out to disable prometheus metrics
       # - "--elastic_host=127.0.0.1"            # elasticsearch host
       # - "--elastic_port=9200"                 # elasticsearch port

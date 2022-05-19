@@ -1,10 +1,10 @@
 ## Cluster environment guide
 
-For best performance the recommended setup uses three server instances, these can be rented VPSs, self hosted VMs (ideally not on one physical host unless the host is sufficiently powerful), or physical computers. One is a dedicated lbcd node, one an elasticsearch server, and the third runs the scribe services. With this configuration the lbcd and elasticsearch servers can be shared between multiple scribe hub servers - more on that later.
+For best performance the recommended setup uses three server instances, these can be rented VPSs, self hosted VMs (ideally not on one physical host unless the host is sufficiently powerful), or physical computers. One is a dedicated lbcd node, one an elasticsearch server, and the third runs the hub services (scribe, herald, and scribe-elastic-sync). With this configuration the lbcd and elasticsearch servers can be shared between multiple herald servers - more on that later.
 Server Requirements (space requirements are at least double what's needed so it's possible to copy snapshots into place or make snapshots):
   - lbcd: 2 cores, 8gb ram (slightly more may be required syncing from scratch, from a snapshot 8 is plenty), 150gb of NVMe storage
   - elasticsearch: 8 cores, 9gb of ram (8gb minimum given to ES), 150gb of SSD speed storage
-  - scribe: 8 cores, 32gb of ram, 200gb of NVMe storage
+  - hub: 8 cores, 32gb of ram, 200gb of NVMe storage
 
 All servers are assumed to be running ubuntu 20.04 with user named `lbry` with passwordless sudo and docker group permissions, ssh configured, ulimits set high, and docker + docker-compose installed. The server running elasticsearch should have swap disabled. The three servers need to be able to communicate with each other, they can be on a local network together or communicate over the internet. This guide will assume the three servers are on the internet.
 
@@ -72,16 +72,16 @@ services:
   - Start elasticsearch by running `docker-compose up -d`
   - Check the status with `docker-compose logs -f --tail 100`
 
-### Setting up the scribe hub instance
-  - Log in (ssh) to the scribe instance and generate and print out a ssh key, this is needed to set up port forwards to the other two instances. Copy the output of the following:
+### Setting up the hub instance
+  - Log in (ssh) to the hub instance and generate and print out a ssh key, this is needed to set up port forwards to the other two instances. Copy the output of the following:
 ```
 ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519 <<<y >/dev/null 2>&1
 ```
-  - After copying the above key, log out of the scribe hub instance.
+  - After copying the above key, log out of the hub instance.
 
   - Log in to the elasticsearch instance add the copied key to `~/.ssh/authorized_keys` (see [this](https://stackoverflow.com/questions/6377009/adding-a-public-key-to-ssh-authorized-keys-does-not-log-me-in-automatically) if confused). Log out of the elasticsearch instance once done.
   - Log in to the lbcd instance and add the copied key to `~/.ssh/authorized_keys`, log out when done.
-  - Log in to the scribe instance and copy the following to `/etc/systemd/system/es-tunnel.service`, replacing `lbry` with your user and `your-elastic-ip` with your elasticsearch instance ip.
+  - Log in to the hub instance and copy the following to `/etc/systemd/system/es-tunnel.service`, replacing `lbry` with your user and `your-elastic-ip` with your elasticsearch instance ip.
 ```
 [Unit]
 Description=Persistent SSH Tunnel for ES
@@ -97,7 +97,7 @@ Group=lbry
 [Install]
 WantedBy=multi-user.target
 ```
-  - Next, copy the following to `/etc/systemd/system/lbcd-tunnel.service` on the scribe instance, replacing `lbry` with your user and `your-lbcd-ip` with your lbcd instance ip.
+  - Next, copy the following to `/etc/systemd/system/lbcd-tunnel.service` on the hub instance, replacing `lbry` with your user and `your-lbcd-ip` with your lbcd instance ip.
 ```
 [Unit]
 Description=Persistent SSH Tunnel for lbcd
@@ -113,21 +113,21 @@ Group=lbry
 [Install]
 WantedBy=multi-user.target
 ```
-  - Verify you can ssh in to the elasticsearch and lbcd instances from the scribe instance
-  - Enable and start the ssh port forward services on the scribe instance
+  - Verify you can ssh in to the elasticsearch and lbcd instances from the hub instance
+  - Enable and start the ssh port forward services on the hub instance
 ```
 sudo systemctl enable es-tunnel.service
 sudo systemctl enable lbcd-tunnel.service
 sudo systemctl start es-tunnel.service
 sudo systemctl start lbcd-tunnel.service
 ```
-  - Build the scribe docker image on the scribe hub instance by running the following:
+  - Build the hub docker image on the hub instance by running the following:
 ```
-git clone https://github.com/lbryio/scribe.git
-cd scribe
-docker build -f ./docker/Dockerfile.scribe -t lbry/scribe:development .
+git clone https://github.com/lbryio/hub.git
+cd hub
+docker build -t lbry/hub:development .
 ```
-  - Copy the following to `~/docker-compose.yml` on the scribe instance
+  - Copy the following to `~/docker-compose.yml` on the hub instance
 ```
 version: "3"
 
@@ -138,7 +138,7 @@ services:
   scribe:
     depends_on:
       - scribe_elastic_sync
-    image: lbry/scribe:${SCRIBE_TAG:-development}
+    image: lbry/hub:${SCRIBE_TAG:-development}
     restart: always
     network_mode: host
     volumes:
@@ -150,7 +150,7 @@ services:
       - "--max_query_workers=2"
       - "--cache_all_tx_hashes"
   scribe_elastic_sync:
-    image: lbry/scribe:${SCRIBE_TAG:-development}
+    image: lbry/hub:${SCRIBE_TAG:-development}
     restart: always
     network_mode: host
     ports:
@@ -159,17 +159,17 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe-elastic-sync
+      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
+      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
     command:
       - "--elastic_host=127.0.0.1"
       - "--elastic_port=9200"
       - "--max_query_workers=2"
-      - "--filtering_channel_ids=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8"
-      - "--blocking_channel_ids=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6"
-  scribe_hub:
+  herald:
     depends_on:
       - scribe_elastic_sync
       - scribe
-    image: lbry/scribe:${SCRIBE_TAG:-development}
+    image: lbry/hub:${SCRIBE_TAG:-development}
     restart: always
     network_mode: host
     ports:
@@ -178,7 +178,9 @@ services:
     volumes:
       - "lbry_rocksdb:/database"
     environment:
-      - HUB_COMMAND=scribe-hub
+      - HUB_COMMAND=herald
+      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
+      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
     command:
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--elastic_host=127.0.0.1"
@@ -186,9 +188,7 @@ services:
       - "--max_query_workers=4"
       - "--host=0.0.0.0"
       - "--max_sessions=100000"
-      - "--filtering_channel_ids=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8"
-      - "--blocking_channel_ids=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6"
       - "--prometheus_port=2112"                # comment out to disable prometheus metrics
 ```
-  - Start the scribe hub services by running `docker-compose up -d`
+  - Start the hub services by running `docker-compose up -d`
   - Check the status with `docker-compose logs -f --tail 100`
