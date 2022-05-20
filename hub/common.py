@@ -1,4 +1,5 @@
 import struct
+import asyncio
 import hashlib
 import hmac
 import ipaddress
@@ -766,3 +767,11 @@ def expand_result(results):
     if inner_hits:
         return expand_result(inner_hits)
     return expanded
+
+
+async def asyncify_for_loop(gen, ticks_per_sleep: int = 1000):
+    async_sleep = asyncio.sleep
+    for cnt, item in enumerate(gen):
+        yield item
+        if cnt % ticks_per_sleep == 0:
+            await async_sleep(0)
