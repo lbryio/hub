@@ -606,25 +606,31 @@ class SessionManager:
         needed_tx_infos = []
         append_needed_tx_info = needed_tx_infos.append
         tx_infos = {}
+        cnt = 0
         for tx_num in tx_nums:
             cached = self.history_tx_info_cache.get(tx_num)
             if cached is not None:
                 tx_infos[tx_num] = cached
             else:
                 append_needed_tx_info(tx_num)
-            await asyncio.sleep(0)
+            cnt += 1
+            if cnt % 1000 == 0:
+                await asyncio.sleep(0)
         if needed_tx_infos:
-
             for tx_num, tx_hash in zip(needed_tx_infos, await self.db.get_tx_hashes(needed_tx_infos)):
                 hist = tx_hash[::-1].hex(), bisect_right(self.db.tx_counts, tx_num)
                 tx_infos[tx_num] = self.history_tx_info_cache[tx_num] = hist
-                await asyncio.sleep(0)
+                cnt += 1
+                if cnt % 1000 == 0:
+                    await asyncio.sleep(0)
         history = []
         history_append = history.append
         for tx_num in tx_nums:
             history_append(tx_infos[tx_num])
-            await asyncio.sleep(0)
-        self.hashX_full_cache[hashX] = history
+            self.hashX_full_cache[hashX] = history
+            cnt += 1
+            if cnt % 1000 == 0:
+                await asyncio.sleep(0)
         return history
 
     def _notify_peer(self, peer):
