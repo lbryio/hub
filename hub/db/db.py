@@ -1173,7 +1173,7 @@ class HubDB:
             raise DBError(f'only got {len(self.headers) - height:,d} headers starting at {height:,d}, not {count:,d}')
         return [self.coin.header_hash(header) for header in self.headers[height:height + count]]
 
-    def _read_history(self, hashX: bytes, limit: int = 1000) -> List[int]:
+    def _read_history(self, hashX: bytes, limit: Optional[int] = 1000) -> List[int]:
         txs = []
         txs_extend = txs.extend
         for hist in self.prefix_db.hashX_history.iterate(prefix=(hashX,), include_key=False):
@@ -1182,7 +1182,7 @@ class HubDB:
                 break
         return txs
 
-    async def read_history(self, hashX: bytes, limit: int = 1000) -> List[int]:
+    async def read_history(self, hashX: bytes, limit: Optional[int] = 1000) -> List[int]:
         return await asyncio.get_event_loop().run_in_executor(self._executor, self._read_history, hashX, limit)
 
     async def limited_history(self, hashX, *, limit=1000):

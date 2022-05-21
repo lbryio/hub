@@ -46,9 +46,12 @@ class HubServerService(BlockchainReaderService):
     def advance(self, height: int):
         super().advance(height)
         touched_hashXs = self.db.prefix_db.touched_hashX.get(height).touched_hashXs
+        self.session_manager.update_history_caches(touched_hashXs)
         self.notifications_to_send.append((set(touched_hashXs), height))
 
     def unwind(self):
+        self.session_manager.hashX_raw_history_cache.clear()
+        self.session_manager.hashX_history_cache.clear()
         prev_count = self.db.tx_counts.pop()
         tx_count = self.db.tx_counts[-1]
         self.db.headers.pop()
