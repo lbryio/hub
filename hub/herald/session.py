@@ -878,8 +878,6 @@ class LBRYElectrumX(asyncio.Protocol):
         """Handle an incoming request.  ElectrumX doesn't receive
         notifications from client sessions.
         """
-        self.session_manager.request_count_metric.labels(method=request.method).inc()
-
         if isinstance(request, Request):
             method = request.method
             if method == 'blockchain.block.get_chunk':
@@ -958,6 +956,7 @@ class LBRYElectrumX(asyncio.Protocol):
                 raise RPCError(JSONRPC.METHOD_NOT_FOUND, f'unknown method "{method}"')
         else:
             raise ValueError
+        self.session_manager.request_count_metric.labels(method=request.method).inc()
         if isinstance(request.args, dict):
             return await coro(**request.args)
         return await coro(*request.args)
