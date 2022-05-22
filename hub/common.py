@@ -1,4 +1,5 @@
 import struct
+import asyncio
 import hashlib
 import hmac
 import ipaddress
@@ -27,6 +28,9 @@ CLAIM_HASH_LEN = 20
 
 HISTOGRAM_BUCKETS = (
     .005, .01, .025, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 60.0, float('inf')
+)
+SIZE_BUCKETS = (
+    1, 10, 100, 500, 1000, 2000, 4000, 7500, 10000, 15000, 25000, 50000, 75000, 100000, 150000, 250000, float('inf')
 )
 
 CLAIM_TYPES = {
@@ -763,3 +767,11 @@ def expand_result(results):
     if inner_hits:
         return expand_result(inner_hits)
     return expanded
+
+
+async def asyncify_for_loop(gen, ticks_per_sleep: int = 1000):
+    async_sleep = asyncio.sleep
+    for cnt, item in enumerate(gen):
+        yield item
+        if cnt % ticks_per_sleep == 0:
+            await async_sleep(0)

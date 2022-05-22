@@ -1245,7 +1245,7 @@ class BlockchainProcessorService(BlockchainService):
         if hashX in self.hashX_full_cache:
             return self.hashX_full_cache[hashX]
         if hashX not in self.hashX_history_cache:
-            self.hashX_history_cache[hashX] = tx_nums = self.db.read_history(hashX, limit=None)
+            self.hashX_history_cache[hashX] = tx_nums = self.db._read_history(hashX, limit=None)
         else:
             tx_nums = self.hashX_history_cache[hashX]
         needed_tx_infos = []
@@ -1257,7 +1257,7 @@ class BlockchainProcessorService(BlockchainService):
             else:
                 append_needed_tx_info(tx_num)
         if needed_tx_infos:
-            for tx_num, tx_hash in zip(needed_tx_infos, self.db.get_tx_hashes(needed_tx_infos)):
+            for tx_num, tx_hash in zip(needed_tx_infos, self.db._get_tx_hashes(needed_tx_infos)):
                 tx_infos[tx_num] = self.history_tx_info_cache[tx_num] = f'{tx_hash[::-1].hex()}:{bisect_right(self.db.tx_counts, tx_num):d}:'
 
         history = ''
@@ -1487,7 +1487,7 @@ class BlockchainProcessorService(BlockchainService):
                 else:
                     append_needed_tx_info(tx_num)
             if needed_tx_infos:
-                for tx_num, tx_hash in zip(needed_tx_infos, self.db.get_tx_hashes(needed_tx_infos)):
+                for tx_num, tx_hash in zip(needed_tx_infos, self.db._get_tx_hashes(needed_tx_infos)):
                     tx_info = f'{tx_hash[::-1].hex()}:{bisect_right(self.db.tx_counts, tx_num):d}:'
                     tx_infos[tx_num] = tx_info
                     self.history_tx_info_cache[tx_num] = tx_info
