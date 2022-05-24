@@ -29,6 +29,7 @@ services:
     restart: always
     network_mode: host
     command:
+      - "--notls"
       - "--rpcuser=lbry"
       - "--rpcpass=lbry"
       - "--rpclisten=127.0.0.1"
