@@ -5,7 +5,7 @@ from collections import defaultdict
 from hub.scribe.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
-    from hub.db import HubDB
+    from hub.scribe.db import PrimaryDB
 
 
 @attr.s(slots=True)
@@ -27,7 +27,7 @@ class MemPoolTxSummary:
 
 
 class MemPool:
-    def __init__(self, coin, db: 'HubDB'):
+    def __init__(self, coin, db: 'PrimaryDB'):
         self.coin = coin
         self._db = db
         self.txs = {}

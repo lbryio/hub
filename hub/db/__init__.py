@@ -1,1 +1,1 @@
-from .db import HubDB
+from .db import SecondaryDB

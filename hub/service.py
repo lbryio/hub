@@ -7,7 +7,7 @@ from prometheus_client import Gauge, Histogram
 
 from hub import __version__, PROMETHEUS_NAMESPACE
 from hub.env import Env
-from hub.db import HubDB
+from hub.db import SecondaryDB
 from hub.db.prefixes import DBState
 from hub.common import HISTOGRAM_BUCKETS
 from hub.metrics import PrometheusServer
@@ -17,6 +17,7 @@ class BlockchainService:
     """
     Base class for blockchain readers as well as the block processor
     """
+
     def __init__(self, env: Env, secondary_name: str, thread_workers: int = 1, thread_prefix: str = 'scribe'):
         self.env = env
         self.log = logging.getLogger(__name__).getChild(self.__class__.__name__)
@@ -27,13 +28,19 @@ class BlockchainService:
         self._executor = ThreadPoolExecutor(thread_workers, thread_name_prefix=thread_prefix)
         self.lock = asyncio.Lock()
         self.last_state: typing.Optional[DBState] = None
-        self.db = HubDB(
-            env.coin, env.db_dir, env.reorg_limit, env.cache_all_claim_txos, env.cache_all_tx_hashes,
-            secondary_name=secondary_name, max_open_files=-1, blocking_channel_ids=env.blocking_channel_ids,
+        self.secondary_name = secondary_name
+        self._stopping = False
+        self.db = None
+        self.open_db()
+
+    def open_db(self):
+        env = self.env
+        self.db = SecondaryDB(
+            env.coin, env.db_dir, self.secondary_name, -1, env.reorg_limit, env.cache_all_claim_txos,
+            env.cache_all_tx_hashes, blocking_channel_ids=env.blocking_channel_ids,
             filtering_channel_ids=env.filtering_channel_ids, executor=self._executor,
             index_address_status=env.index_address_status
         )
-        self._stopping = False
 
     def start_cancellable(self, run, *args):
         _flag = asyncio.Event()
@@ -167,7 +174,7 @@ class BlockchainReaderService(BlockchainService):
             assert len(self.db.total_transactions) == tx_count, f"{len(self.db.total_transactions)} vs {tx_count}"
 
         header = self.db.prefix_db.header.get(height, deserialize_value=False)
-        self.db.headers.append(header)
+        # self.db.headers.append(header)
         self.db.block_hashes.append(self.env.coin.header_hash(header))
 
     def unwind(self):
@@ -176,7 +183,7 @@ class BlockchainReaderService(BlockchainService):
         """
         prev_count = self.db.tx_counts.pop()
         tx_count = self.db.tx_counts[-1]
-        self.db.headers.pop()
+        # self.db.headers.pop()
         self.db.block_hashes.pop()
         if self.db._cache_all_tx_hashes:
             for _ in range(prev_count - tx_count):
@@ -202,7 +209,8 @@ class BlockchainReaderService(BlockchainService):
         rewound = False
         if self.last_state:
             while True:
-                if self.db.headers[-1] == self.db.prefix_db.header.get(last_height, deserialize_value=False):
+                if self.db.block_hashes[-1] == self.env.coin.header_hash(
+                        self.db.prefix_db.header.get(last_height, deserialize_value=False)):
                     self.log.debug("connects to block %i", last_height)
                     break
                 else:

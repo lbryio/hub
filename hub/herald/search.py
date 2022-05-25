@@ -10,7 +10,7 @@ from hub.schema.result import Censor, Outputs
 from hub.common import LRUCache, IndexVersionMismatch, INDEX_DEFAULT_SETTINGS, expand_query, expand_result
 from hub.db.common import ResolveResult
 if TYPE_CHECKING:
-    from hub.db import HubDB
+    from hub.db import SecondaryDB
 
 
 class ChannelResolution(str):
@@ -28,7 +28,7 @@ class StreamResolution(str):
 class SearchIndex:
     VERSION = 1
 
-    def __init__(self, hub_db: 'HubDB', index_prefix: str, search_timeout=3.0, elastic_host='localhost',
+    def __init__(self, hub_db: 'SecondaryDB', index_prefix: str, search_timeout=3.0, elastic_host='localhost',
                  elastic_port=9200):
         self.hub_db = hub_db
         self.search_timeout = search_timeout
