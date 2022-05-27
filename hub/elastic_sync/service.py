@@ -243,6 +243,7 @@ class ElasticSyncService(BlockchainReaderService):
         self._advanced = True
 
     def unwind(self):
+        self.db.block_timestamp_cache.clear()
         reverted_block_hash = self.db.block_hashes[-1]
         super().unwind()
         packed = self.db.prefix_db.undo.get(len(self.db.tx_counts), reverted_block_hash)

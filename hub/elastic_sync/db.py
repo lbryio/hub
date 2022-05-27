@@ -1,17 +1,30 @@
-from typing import Optional, Set, Dict
+from typing import Optional, Set, Dict, List
+from concurrent.futures.thread import ThreadPoolExecutor
 from hub.schema.claim import guess_stream_type
 from hub.schema.result import Censor
-from hub.common import hash160, STREAM_TYPES, CLAIM_TYPES
+from hub.common import hash160, STREAM_TYPES, CLAIM_TYPES, LRUCache
 from hub.db import SecondaryDB
 from hub.db.common import ResolveResult
 
 
 class ElasticSyncDB(SecondaryDB):
+    def __init__(self, coin, db_dir: str, secondary_name: str, max_open_files: int = -1, reorg_limit: int = 200,
+                 cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
+                 blocking_channel_ids: List[str] = None,
+                 filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
+                 index_address_status=False):
+        super().__init__(coin, db_dir, secondary_name, max_open_files, reorg_limit, cache_all_claim_txos,
+                         cache_all_tx_hashes, blocking_channel_ids, filtering_channel_ids, executor,
+                         index_address_status)
+        self.block_timestamp_cache = LRUCache(1024)
+
     def estimate_timestamp(self, height: int) -> int:
+        if height in self.block_timestamp_cache:
+            return self.block_timestamp_cache[height]
         header = self.prefix_db.header.get(height, deserialize_value=False)
-        if header:
-            return int.from_bytes(header[100:104], byteorder='little')
-        return int(160.6855883050695 * height)
+        timestamp = int(160.6855883050695 * height) if header else int.from_bytes(header[100:104], byteorder='little')
+        self.block_timestamp_cache[height] = timestamp
+        return timestamp
 
     def _prepare_claim_metadata(self, claim_hash: bytes, claim: ResolveResult):
         metadata = self.get_claim_metadata(claim.tx_hash, claim.position)
