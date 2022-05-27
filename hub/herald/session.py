@@ -1646,7 +1646,8 @@ class LBRYElectrumX(asyncio.Protocol):
     async def relayfee(self):
         """The minimum fee a low-priority tx must pay in order to be accepted
         to the daemon's memory pool."""
-        return await self.daemon_request('relayfee')
+        # return await self.daemon_request('relayfee')
+        return 0.00001
 
     async def estimatefee(self, number):
         """The estimated transaction fee per kilobyte to be paid for a
@@ -1654,8 +1655,9 @@ class LBRYElectrumX(asyncio.Protocol):
 
         number: the number of blocks
         """
-        number = non_negative_integer(number)
-        return await self.daemon_request('estimatefee', number)
+        # number = non_negative_integer(number)
+        # return await self.daemon_request('estimatefee', number)
+        return 0.00014601
 
     async def ping(self):
         """Serves as a connection keep-alive mechanism and for the client to
