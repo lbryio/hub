@@ -633,8 +633,27 @@ class SecondaryDB:
         if status:
             return status.hex()
 
+    def _get_hashX_statuses(self, hashXes: List[bytes]):
+        statuses = {
+            hashX: status
+            for hashX, status in zip(hashXes, self.prefix_db.hashX_mempool_status.multi_get(
+                [(hashX,) for hashX in hashXes], deserialize_value=False
+            )) if status is not None
+        }
+        if len(statuses) < len(hashXes):
+            statuses.update({
+                hashX: status
+                for hashX, status in zip(hashXes, self.prefix_db.hashX_status.multi_get(
+                    [(hashX,) for hashX in hashXes if hashX not in statuses], deserialize_value=False
+                )) if status is not None
+            })
+        return [None if hashX not in statuses else statuses[hashX].hex() for hashX in hashXes]
+
     async def get_hashX_status(self, hashX: bytes):
         return await asyncio.get_event_loop().run_in_executor(self._executor, self._get_hashX_status, hashX)
+
+    async def get_hashX_statuses(self, hashXes: List[bytes]):
+        return await asyncio.get_event_loop().run_in_executor(self._executor, self._get_hashX_statuses, hashXes)
 
     def get_tx_hash(self, tx_num: int) -> bytes:
         if self._cache_all_tx_hashes:
