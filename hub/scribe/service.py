@@ -12,6 +12,7 @@ from hub.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from hub.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
 from hub.error.base import ChainError
 from hub.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256, LRUCache
+from hub.scribe.db import PrimaryDB
 from hub.scribe.daemon import LBCDaemon
 from hub.scribe.transaction import Tx, TxOutput, TxInput, Block
 from hub.scribe.prefetcher import Prefetcher
@@ -120,6 +121,15 @@ class BlockchainProcessorService(BlockchainService):
         self.hashX_history_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
         self.hashX_full_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
         self.history_tx_info_cache = LRUCache(2 ** 16)
+
+    def open_db(self):
+        env = self.env
+        self.db = PrimaryDB(
+            env.coin, env.db_dir, env.reorg_limit, cache_all_claim_txos=env.cache_all_claim_txos,
+            cache_all_tx_hashes=env.cache_all_tx_hashes, max_open_files=env.db_max_open_files,
+            blocking_channel_ids=env.blocking_channel_ids, filtering_channel_ids=env.filtering_channel_ids,
+            executor=self._executor, index_address_status=env.index_address_status
+        )
 
     async def run_in_thread_with_lock(self, func, *args):
         # Run in a thread to prevent blocking.  Shielded so that
@@ -1383,7 +1393,6 @@ class BlockchainProcessorService(BlockchainService):
         )
 
         self.height = height
-        self.db.headers.append(block.header)
         self.db.block_hashes.append(self.env.coin.header_hash(block.header))
         self.tip = self.coin.header_hash(block.header)
 
@@ -1549,7 +1558,6 @@ class BlockchainProcessorService(BlockchainService):
         # Check and update self.tip
 
         self.db.tx_counts.pop()
-        self.db.headers.pop()
         reverted_block_hash = self.db.block_hashes.pop()
         self.tip = self.db.block_hashes[-1]
         if self.env.cache_all_tx_hashes:

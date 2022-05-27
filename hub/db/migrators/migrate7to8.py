@@ -5,7 +5,7 @@ import typing
 from bisect import bisect_right
 from hub.common import sha256
 if typing.TYPE_CHECKING:
-    from hub.db.db import HubDB
+    from hub.scribe.db import PrimaryDB
 
 FROM_VERSION = 7
 TO_VERSION = 8
@@ -35,7 +35,7 @@ def hashX_history(db: 'HubDB', hashX: bytes):
     return history, to_delete
 
 
-def hashX_status_from_history(db: 'HubDB', history: bytes) -> bytes:
+def hashX_status_from_history(db: 'PrimaryDB', history: bytes) -> bytes:
     tx_counts = db.tx_counts
     hist_tx_nums = array.array('I')
     hist_tx_nums.frombytes(history)

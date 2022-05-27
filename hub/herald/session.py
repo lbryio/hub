@@ -28,7 +28,7 @@ from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, 
 from hub.herald.common import BatchRequest, ProtocolError, Request, Batch, Notification
 from hub.herald.framer import NewlineFramer
 if typing.TYPE_CHECKING:
-    from hub.db import HubDB
+    from hub.db import SecondaryDB
     from hub.herald.env import ServerEnv
     from hub.scribe.daemon import LBCDaemon
     from hub.herald.mempool import HubMemPool
@@ -179,7 +179,7 @@ class SessionManager:
         namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
 
-    def __init__(self, env: 'ServerEnv', db: 'HubDB', mempool: 'HubMemPool',
+    def __init__(self, env: 'ServerEnv', db: 'SecondaryDB', mempool: 'HubMemPool',
                  daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
@@ -1750,7 +1750,7 @@ class LBRYElectrumX(asyncio.Protocol):
             if not verbose:
                 return raw_tx.hex()
             return self.coin.transaction(raw_tx).as_dict(self.coin)
-        return RPCError("No such mempool or blockchain transaction.")
+        return RPCError(BAD_REQUEST, "No such mempool or blockchain transaction.")
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
         """Return a merkle branch to a transaction.

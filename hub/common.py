@@ -347,14 +347,9 @@ INVALID_ARGS = -32602
 
 
 class CodeMessageError(Exception):
-
-    @property
-    def code(self):
-        return self.args[0]
-
-    @property
-    def message(self):
-        return self.args[1]
+    def __init__(self, code: int, message: str):
+        self.code = code
+        self.message = message
 
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
@@ -380,7 +375,6 @@ class CodeMessageError(Exception):
 
 class RPCError(CodeMessageError):
     pass
-
 
 
 class DaemonError(Exception):

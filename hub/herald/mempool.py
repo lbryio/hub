@@ -13,7 +13,7 @@ from hub.scribe.transaction.deserializer import Deserializer
 
 if typing.TYPE_CHECKING:
     from hub.herald.session import SessionManager
-    from hub.db import HubDB
+    from hub.db import SecondaryDB
 
 
 @attr.s(slots=True)
@@ -46,7 +46,7 @@ mempool_touched_address_count_metric = Gauge(
 
 
 class HubMemPool:
-    def __init__(self, coin, db: 'HubDB', refresh_secs=1.0):
+    def __init__(self, coin, db: 'SecondaryDB', refresh_secs=1.0):
         self.coin = coin
         self._db = db
         self.logger = logging.getLogger(__name__)

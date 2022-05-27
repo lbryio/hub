@@ -5,6 +5,7 @@ from hub.scribe.daemon import LBCDaemon
 from hub.herald.session import SessionManager
 from hub.herald.mempool import HubMemPool
 from hub.herald.udp import StatusServer
+from hub.herald.db import HeraldDB
 from hub.service import BlockchainReaderService
 from hub.notifier_protocol import ElasticNotifierClientProtocol
 if typing.TYPE_CHECKING:
@@ -35,6 +36,15 @@ class HubServerService(BlockchainReaderService):
         self._es_height = None
         self._es_block_hash = None
 
+    def open_db(self):
+        env = self.env
+        self.db = HeraldDB(
+            env.coin, env.db_dir, self.secondary_name, -1, env.reorg_limit, env.cache_all_claim_txos,
+            env.cache_all_tx_hashes, blocking_channel_ids=env.blocking_channel_ids,
+            filtering_channel_ids=env.filtering_channel_ids, executor=self._executor,
+            index_address_status=env.index_address_status
+        )
+
     def clear_caches(self):
         self.session_manager.clear_caches()
         # self.clear_search_cache()
@@ -54,7 +64,6 @@ class HubServerService(BlockchainReaderService):
         self.session_manager.hashX_history_cache.clear()
         prev_count = self.db.tx_counts.pop()
         tx_count = self.db.tx_counts[-1]
-        self.db.headers.pop()
         self.db.block_hashes.pop()
         current_count = prev_count
         for _ in range(prev_count - tx_count):

@@ -12,6 +12,7 @@ from hub.db.revertable import RevertableOp
 from hub.db.common import TrendingNotification, DB_PREFIXES
 from hub.notifier_protocol import ElasticNotifierProtocol
 from hub.elastic_sync.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
+from hub.elastic_sync.db import ElasticSyncDB
 if typing.TYPE_CHECKING:
     from hub.elastic_sync.env import ElasticEnv
 
@@ -43,6 +44,15 @@ class ElasticSyncService(BlockchainReaderService):
         self.synchronized = asyncio.Event()
         self._listeners: typing.List[ElasticNotifierProtocol] = []
         self._force_reindex = False
+
+    def open_db(self):
+        env = self.env
+        self.db = ElasticSyncDB(
+            env.coin, env.db_dir, self.secondary_name, -1, env.reorg_limit, env.cache_all_claim_txos,
+            env.cache_all_tx_hashes, blocking_channel_ids=env.blocking_channel_ids,
+            filtering_channel_ids=env.filtering_channel_ids, executor=self._executor,
+            index_address_status=env.index_address_status
+        )
 
     async def run_es_notifier(self, synchronized: asyncio.Event):
         server = await asyncio.get_event_loop().create_server(
@@ -233,6 +243,7 @@ class ElasticSyncService(BlockchainReaderService):
         self._advanced = True
 
     def unwind(self):
+        self.db.block_timestamp_cache.clear()
         reverted_block_hash = self.db.block_hashes[-1]
         super().unwind()
         packed = self.db.prefix_db.undo.get(len(self.db.tx_counts), reverted_block_hash)
