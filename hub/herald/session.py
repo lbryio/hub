@@ -1750,7 +1750,7 @@ class LBRYElectrumX(asyncio.Protocol):
             if not verbose:
                 return raw_tx.hex()
             return self.coin.transaction(raw_tx).as_dict(self.coin)
-        return RPCError("No such mempool or blockchain transaction.")
+        return RPCError(BAD_REQUEST, "No such mempool or blockchain transaction.")
 
     def _get_merkle_branch(self, tx_hashes, tx_pos):
         """Return a merkle branch to a transaction.
