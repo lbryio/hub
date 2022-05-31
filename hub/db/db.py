@@ -976,23 +976,3 @@ class SecondaryDB:
             self.logger.warning(f'all_utxos: tx hash not '
                                 f'found (reorg?), retrying...')
             await asyncio.sleep(0.25)
-
-    async def lookup_utxos(self, prevouts):
-        def lookup_utxos():
-            utxos = []
-            utxo_append = utxos.append
-            for (tx_hash, nout) in prevouts:
-                tx_num_val = self.prefix_db.tx_num.get(tx_hash)
-                if not tx_num_val:
-                    print("no tx num for ", tx_hash[::-1].hex())
-                    continue
-                tx_num = tx_num_val.tx_num
-                hashX_val = self.prefix_db.hashX_utxo.get(tx_hash[:4], tx_num, nout)
-                if not hashX_val:
-                    continue
-                hashX = hashX_val.hashX
-                utxo_value = self.prefix_db.utxo.get(hashX, tx_num, nout)
-                if utxo_value:
-                    utxo_append((hashX, utxo_value.amount))
-            return utxos
-        return await asyncio.get_event_loop().run_in_executor(self._executor, lookup_utxos)
