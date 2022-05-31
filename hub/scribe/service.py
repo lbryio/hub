@@ -118,8 +118,8 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
-        self.hashX_history_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
-        self.hashX_full_cache = LRUCache(min(100, max(0, env.hashX_history_cache_size)))
+        self.hashX_history_cache = LRUCache(max(100, env.hashX_history_cache_size))
+        self.hashX_full_cache = LRUCache(max(100, env.hashX_history_cache_size))
         self.history_tx_info_cache = LRUCache(2 ** 16)
 
     def open_db(self):

@@ -28,7 +28,7 @@ class BlockchainEnv(Env):
                             help='This setting translates into the max_open_files option given to rocksdb. '
                                  'A higher number will use more memory. Defaults to 64.')
         parser.add_argument('--address_history_cache_size', type=int,
-                            default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 1000),
+                            default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 2 ** 13),
                             help="LRU cache size for address histories, used when processing new blocks "
                                  "and when processing mempool updates. Can be set in env with "
                                  "'ADDRESS_HISTORY_CACHE_SIZE'")
