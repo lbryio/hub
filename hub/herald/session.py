@@ -1273,22 +1273,28 @@ class LBRYElectrumX(asyncio.Protocol):
             self.session_manager.pending_query_metric.dec()
             self.session_manager.executor_time_metric.observe(time.perf_counter() - start)
 
-    async def _cached_resolve_url(self, url):
-        if url not in self.session_manager.resolve_cache:
-            self.session_manager.resolve_cache[url] = await self.loop.run_in_executor(self.db._executor, self.db._resolve, url)
-        return self.session_manager.resolve_cache[url]
-
     async def claimtrie_resolve(self, *urls) -> str:
-        sorted_urls = tuple(sorted(urls))
-        self.session_manager.urls_to_resolve_count_metric.inc(len(sorted_urls))
+        # sorted_urls = tuple(sorted(urls))
+        self.session_manager.urls_to_resolve_count_metric.inc(len(urls))
         try:
-            if sorted_urls in self.session_manager.resolve_outputs_cache:
-                return self.session_manager.resolve_outputs_cache[sorted_urls]
+            # if sorted_urls in self.session_manager.resolve_outputs_cache:
+            #     return self.session_manager.resolve_outputs_cache[sorted_urls]
             rows, extra = [], []
+            resolved = {}
+            needed = defaultdict(list)
+            for idx, url in enumerate(urls):
+                if url in self.session_manager.resolve_cache:
+                    stream, channel, repost, reposted_channel = self.session_manager.resolve_cache[url]
+                    resolved[url] = stream, channel, repost, reposted_channel
+                else:
+                    needed[url].append(idx)
+            if needed:
+                resolved_needed = await self.db.batch_resolve_urls(list(needed))
+                for url, resolve_result in resolved_needed.items():
+                    self.session_manager.resolve_cache[url] = resolve_result
+                resolved.update(resolved_needed)
             for url in urls:
-                if url not in self.session_manager.resolve_cache:
-                    self.session_manager.resolve_cache[url] = await self._cached_resolve_url(url)
-                stream, channel, repost, reposted_channel = self.session_manager.resolve_cache[url]
+                (stream, channel, repost, reposted_channel) = resolved[url]
                 if isinstance(channel, ResolveCensoredError):
                     rows.append(channel)
                     extra.append(channel.censor_row)
@@ -1303,28 +1309,24 @@ class LBRYElectrumX(asyncio.Protocol):
                     extra.append(reposted_channel.censor_row)
                 elif channel and not stream:
                     rows.append(channel)
-                    # print("resolved channel", channel.name.decode())
                     if repost:
                         extra.append(repost)
                     if reposted_channel:
                         extra.append(reposted_channel)
                 elif stream:
-                    # print("resolved stream", stream.name.decode())
                     rows.append(stream)
                     if channel:
-                        # print("and channel", channel.name.decode())
                         extra.append(channel)
                     if repost:
                         extra.append(repost)
                     if reposted_channel:
                         extra.append(reposted_channel)
-                await asyncio.sleep(0)
-            self.session_manager.resolve_outputs_cache[sorted_urls] = result = await self.loop.run_in_executor(
-                None, Outputs.to_base64, rows, extra
-            )
-            return result
+                # await asyncio.sleep(0)
+
+            # self.session_manager.resolve_outputs_cache[sorted_urls] = result = Outputs.to_base64(rows, extra)
+            return Outputs.to_base64(rows, extra)
         finally:
-            self.session_manager.resolved_url_count_metric.inc(len(sorted_urls))
+            self.session_manager.resolved_url_count_metric.inc(len(urls))
 
     async def get_server_height(self):
         return self.db.db_height

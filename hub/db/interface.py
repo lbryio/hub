@@ -1,3 +1,4 @@
+import asyncio
 import struct
 import typing
 import rocksdb
@@ -100,6 +101,22 @@ class PrefixRow(metaclass=PrefixRowType):
         return [
             handle_value(result[packed_keys[tuple(k_args)]]) for k_args in key_args
         ]
+
+    async def multi_get_async_gen(self, executor, key_args: typing.List[typing.Tuple], deserialize_value=True, step=1000):
+        packed_keys = {self.pack_key(*args): args for args in key_args}
+        assert len(packed_keys) == len(key_args), 'duplicate partial keys given to multi_get_dict'
+        db_result = await asyncio.get_event_loop().run_in_executor(
+            executor, self._db.multi_get, [(self._column_family, key) for key in packed_keys]
+        )
+        unpack_value = self.unpack_value
+
+        def handle_value(v):
+            return None if v is None else v if not deserialize_value else unpack_value(v)
+
+        for idx, (k, v) in enumerate((db_result or {}).items()):
+            yield (packed_keys[k[-1]], handle_value(v))
+            if idx % step == 0:
+                await asyncio.sleep(0)
 
     def stage_multi_put(self, items):
         self._op_stack.multi_put([RevertablePut(self.pack_key(*k), self.pack_value(*v)) for k, v in items])

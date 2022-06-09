@@ -9,7 +9,7 @@ from hub.schema.result import Censor
 from hub.service import BlockchainReaderService
 from hub.common import IndexVersionMismatch, ALL_FIELDS, INDEX_DEFAULT_SETTINGS, expand_query
 from hub.db.revertable import RevertableOp
-from hub.db.common import TrendingNotification, DB_PREFIXES
+from hub.db.common import TrendingNotification, DB_PREFIXES, ResolveResult
 from hub.notifier_protocol import ElasticNotifierProtocol
 from hub.elastic_sync.fast_ar_trending import FAST_AR_TRENDING_SCRIPT
 from hub.elastic_sync.db import ElasticSyncDB
@@ -219,10 +219,21 @@ class ElasticSyncService(BlockchainReaderService):
     async def _claim_producer(self):
         for deleted in self._deleted_claims:
             yield self._delete_claim_query(self.index, deleted)
-        for touched in self._touched_claims:
-            claim = self.db.claim_producer(touched)
-            if claim:
-                yield self._upsert_claim_query(self.index, claim)
+
+        touched_claims = list(self._touched_claims)
+
+        for idx in range(0, len(touched_claims), 1000):
+            batch = touched_claims[idx:idx+1000]
+            async for claim_hash, claim, _ in self.db._prepare_resolve_results(batch, include_extra=False,
+                                                                               apply_blocking=False,
+                                                                               apply_filtering=False):
+                if not claim:
+                    self.log.warning("wat")
+                    continue
+                claim = self.db._prepare_claim_metadata(claim.claim_hash, claim)
+                if claim:
+                    yield self._upsert_claim_query(self.index, claim)
+
         for claim_hash, notifications in self._trending.items():
             yield self._update_trending_query(self.index, claim_hash, notifications)
 
