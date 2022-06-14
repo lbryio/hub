@@ -47,7 +47,7 @@ class BlockchainProcessorService(BlockchainService):
     def __init__(self, env: 'BlockchainEnv'):
         super().__init__(env, secondary_name='', thread_workers=1, thread_prefix='block-processor')
         self.env = env
-        self.daemon = LBCDaemon(env.coin, env.daemon_url)
+        self.daemon = LBCDaemon(env.coin, env.daemon_url, daemon_ca_path=env.daemon_ca_path)
         self.mempool = MemPool(env.coin, self.db)
         self.coin = env.coin
         self.wait_for_blocks_duration = 0.1

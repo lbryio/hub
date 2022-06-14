@@ -19,7 +19,7 @@ class HubServerService(BlockchainReaderService):
         self.notifications_to_send = []
         self.mempool_notifications = set()
         self.status_server = StatusServer()
-        self.daemon = LBCDaemon(env.coin, env.daemon_url)  # only needed for broadcasting txs
+        self.daemon = LBCDaemon(env.coin, env.daemon_url, daemon_ca_path=env.daemon_ca_path)  # only needed for broadcasting txs
         self.mempool = HubMemPool(self.env.coin, self.db)
         self.session_manager = SessionManager(
             env, self.db, self.mempool, self.daemon,
