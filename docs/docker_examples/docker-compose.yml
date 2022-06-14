@@ -17,6 +17,7 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe
+      - SNAPSHOT_URL=https://snapshots.lbry.com/hub/lbry-rocksdb.zip
     command:  # for full options, see `scribe --help`
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=2"
@@ -41,7 +42,7 @@ services:
       - "--elastic_port=9200"                 # elasticsearch port
       - "--elastic_notifier_host=127.0.0.1"   # address for the elastic sync notifier to connect to
       - "--elastic_notifier_port=19080"
-  scribe_hub:
+  herald:
     depends_on:
       - lbcd
       - scribe_elastic_sync
