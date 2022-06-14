@@ -22,6 +22,7 @@ services:
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=2"
       # - "--cache_all_tx_hashes"  # uncomment to keep an index of all tx hashes in memory. This uses lots (10+g) of memory but substantially improves performance.
+      - "--index_address_statuses"
   scribe_elastic_sync:
     depends_on:
       - es01
@@ -60,6 +61,7 @@ services:
       - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
       - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
     command:  # for full options, see `herald --help`
+      - "--index_address_statuses"
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=4"
       - "--host=0.0.0.0"
