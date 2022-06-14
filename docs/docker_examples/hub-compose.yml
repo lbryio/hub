@@ -14,6 +14,7 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe
+      - SNAPSHOT_URL=https://snapshots.lbry.com/hub/lbry-rocksdb.zip
     command:
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=2"
