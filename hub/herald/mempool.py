@@ -242,7 +242,7 @@ class HubMemPool:
                                                   (self.session_manager.hsub_results[session.subscribe_headers_raw],))
                     )
                 if hashXes:
-                    asyncio.create_task(session.send_history_notifications(*hashXes))
+                    asyncio.create_task(session.send_history_notifications(hashXes))
 
     async def _notify_sessions(self, height, touched, new_touched):
         """Notify sessions about height changes and touched addresses."""

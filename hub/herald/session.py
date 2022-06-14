@@ -22,7 +22,7 @@ from hub.herald import PROTOCOL_MIN, PROTOCOL_MAX, HUB_PROTOCOL_VERSION
 from hub.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from hub.herald.search import SearchIndex
 from hub.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time, SIZE_BUCKETS
-from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS
+from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS, asyncify_for_loop
 from hub.common import LRUCacheWithMetrics
 from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
 from hub.herald.common import BatchRequest, ProtocolError, Request, Batch, Notification
@@ -1181,33 +1181,39 @@ class LBRYElectrumX(asyncio.Protocol):
         status = sha256(history.encode())
         return status.hex()
 
-    async def send_history_notifications(self, *hashXes: typing.Iterable[bytes]):
+    async def get_hashX_statuses(self, hashXes: typing.List[bytes]):
+        if self.env.index_address_status:
+            return await self.db.get_hashX_statuses(hashXes)
+        return [await self.get_hashX_status(hashX) for hashX in hashXes]
+
+    async def send_history_notifications(self, hashXes: typing.List[bytes]):
         notifications = []
-        for hashX in hashXes:
+        start = time.perf_counter()
+        statuses = await self.get_hashX_statuses(hashXes)
+        duration = time.perf_counter() - start
+        self.session_manager.address_history_metric.observe(duration)
+        start = time.perf_counter()
+        scripthash_notifications = 0
+        address_notifications = 0
+        for hashX, status in zip(hashXes, statuses):
             alias = self.hashX_subs[hashX]
             if len(alias) == 64:
                 method = 'blockchain.scripthash.subscribe'
+                scripthash_notifications += 1
             else:
                 method = 'blockchain.address.subscribe'
-            start = time.perf_counter()
-            status = await self.get_hashX_status(hashX)
-            duration = time.perf_counter() - start
-            self.session_manager.address_history_metric.observe(duration)
-            notifications.append((method, (alias, status)))
-            if duration > 30:
-                self.logger.warning("slow history notification (%s) for '%s'", duration, alias)
-
-        start = time.perf_counter()
-        self.session_manager.notifications_in_flight_metric.inc()
-        for method, args in notifications:
-            self.NOTIFICATION_COUNT.labels(method=method,).inc()
+                address_notifications += 1
+            notifications.append(Notification(method, (alias, status)))
+        if scripthash_notifications:
+            self.NOTIFICATION_COUNT.labels(method='blockchain.scripthash.subscribe',).inc(scripthash_notifications)
+        if address_notifications:
+            self.NOTIFICATION_COUNT.labels(method='blockchain.address.subscribe', ).inc(address_notifications)
+        self.session_manager.notifications_in_flight_metric.inc(len(notifications))
         try:
-            await self.send_notifications(
-                Batch([Notification(method, (alias, status)) for (method, (alias, status)) in notifications])
-            )
+            await self.send_notifications(Batch(notifications))
             self.session_manager.notifications_sent_metric.observe(time.perf_counter() - start)
         finally:
-            self.session_manager.notifications_in_flight_metric.dec()
+            self.session_manager.notifications_in_flight_metric.dec(len(notifications))
 
     # def get_metrics_or_placeholder_for_api(self, query_name):
     #     """ Do not hold on to a reference to the metrics
@@ -1267,22 +1273,28 @@ class LBRYElectrumX(asyncio.Protocol):
             self.session_manager.pending_query_metric.dec()
             self.session_manager.executor_time_metric.observe(time.perf_counter() - start)
 
-    async def _cached_resolve_url(self, url):
-        if url not in self.session_manager.resolve_cache:
-            self.session_manager.resolve_cache[url] = await self.loop.run_in_executor(self.db._executor, self.db._resolve, url)
-        return self.session_manager.resolve_cache[url]
-
     async def claimtrie_resolve(self, *urls) -> str:
-        sorted_urls = tuple(sorted(urls))
-        self.session_manager.urls_to_resolve_count_metric.inc(len(sorted_urls))
+        # sorted_urls = tuple(sorted(urls))
+        self.session_manager.urls_to_resolve_count_metric.inc(len(urls))
         try:
-            if sorted_urls in self.session_manager.resolve_outputs_cache:
-                return self.session_manager.resolve_outputs_cache[sorted_urls]
+            # if sorted_urls in self.session_manager.resolve_outputs_cache:
+            #     return self.session_manager.resolve_outputs_cache[sorted_urls]
             rows, extra = [], []
+            resolved = {}
+            needed = defaultdict(list)
+            for idx, url in enumerate(urls):
+                if url in self.session_manager.resolve_cache:
+                    stream, channel, repost, reposted_channel = self.session_manager.resolve_cache[url]
+                    resolved[url] = stream, channel, repost, reposted_channel
+                else:
+                    needed[url].append(idx)
+            if needed:
+                resolved_needed = await self.db.batch_resolve_urls(list(needed))
+                for url, resolve_result in resolved_needed.items():
+                    self.session_manager.resolve_cache[url] = resolve_result
+                resolved.update(resolved_needed)
             for url in urls:
-                if url not in self.session_manager.resolve_cache:
-                    self.session_manager.resolve_cache[url] = await self._cached_resolve_url(url)
-                stream, channel, repost, reposted_channel = self.session_manager.resolve_cache[url]
+                (stream, channel, repost, reposted_channel) = resolved[url]
                 if isinstance(channel, ResolveCensoredError):
                     rows.append(channel)
                     extra.append(channel.censor_row)
@@ -1297,28 +1309,24 @@ class LBRYElectrumX(asyncio.Protocol):
                     extra.append(reposted_channel.censor_row)
                 elif channel and not stream:
                     rows.append(channel)
-                    # print("resolved channel", channel.name.decode())
                     if repost:
                         extra.append(repost)
                     if reposted_channel:
                         extra.append(reposted_channel)
                 elif stream:
-                    # print("resolved stream", stream.name.decode())
                     rows.append(stream)
                     if channel:
-                        # print("and channel", channel.name.decode())
                         extra.append(channel)
                     if repost:
                         extra.append(repost)
                     if reposted_channel:
                         extra.append(reposted_channel)
-                await asyncio.sleep(0)
-            self.session_manager.resolve_outputs_cache[sorted_urls] = result = await self.loop.run_in_executor(
-                None, Outputs.to_base64, rows, extra
-            )
-            return result
+                # await asyncio.sleep(0)
+
+            # self.session_manager.resolve_outputs_cache[sorted_urls] = result = Outputs.to_base64(rows, extra)
+            return Outputs.to_base64(rows, extra)
         finally:
-            self.session_manager.resolved_url_count_metric.inc(len(sorted_urls))
+            self.session_manager.resolved_url_count_metric.inc(len(urls))
 
     async def get_server_height(self):
         return self.db.db_height
@@ -1470,12 +1478,13 @@ class LBRYElectrumX(asyncio.Protocol):
         address: the address to subscribe to"""
         if len(addresses) > 1000:
             raise RPCError(BAD_REQUEST, f'too many addresses in subscription request: {len(addresses)}')
-        results = []
+        hashXes = [item async for item in asyncify_for_loop((self.address_to_hashX(address) for address in addresses), 100)]
+        statuses = await self.get_hashX_statuses(hashXes)
+        for hashX, alias in zip(hashXes, addresses):
+            self.hashX_subs[hashX] = alias
+            self.session_manager.hashx_subscriptions_by_session[hashX].add(id(self))
         self.session_manager.address_subscription_metric.inc(len(addresses))
-        for address in addresses:
-            results.append(await self.hashX_subscribe(self.address_to_hashX(address), address))
-            await asyncio.sleep(0)
-        return results
+        return statuses
 
     async def address_unsubscribe(self, address):
         """Unsubscribe an address.
