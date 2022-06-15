@@ -3,6 +3,7 @@ import itertools
 import json
 import time
 import logging
+import ssl
 from functools import wraps
 
 import aiohttp
@@ -43,7 +44,7 @@ class LBCDaemon:
     )
 
     def __init__(self, coin, url, max_workqueue=10, init_retry=0.25,
-                 max_retry=4.0):
+                 max_retry=4.0, daemon_ca_path=None):
         self.coin = coin
         self.logger = logging.getLogger(__name__)
         self.set_url(url)
@@ -54,7 +55,10 @@ class LBCDaemon:
         self.max_retry = max_retry
         self._height = None
         self.available_rpcs = {}
-        self.connector = aiohttp.TCPConnector(ssl=False)
+        ssl_context = None if not daemon_ca_path else ssl.create_default_context(
+            purpose=ssl.Purpose.CLIENT_AUTH, capath=daemon_ca_path
+        )
+        self.connector = aiohttp.TCPConnector(ssl=ssl_context is not None, ssl_context=ssl_context)
         self._block_hash_cache = LRUCacheWithMetrics(1024)
         self._block_cache = LRUCacheWithMetrics(64, metric_name='block', namespace=NAMESPACE)
 

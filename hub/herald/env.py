@@ -11,7 +11,7 @@ class ServerEnv(Env):
                  session_timeout=None, drop_client=None, description=None, daily_fee=None,
                  database_query_timeout=None, elastic_notifier_host=None, elastic_notifier_port=None,
                  blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None,
-                 index_address_status=None, address_history_cache_size=None):
+                 index_address_status=None, address_history_cache_size=None, daemon_ca_path=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
                          cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
@@ -52,6 +52,7 @@ class ServerEnv(Env):
             (float(self.integer('QUERY_TIMEOUT_MS', 10000)) / 1000.0)
         self.hashX_history_cache_size = address_history_cache_size if address_history_cache_size is not None \
             else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 1000)
+        self.daemon_ca_path = daemon_ca_path if daemon_ca_path else None
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
@@ -61,6 +62,8 @@ class ServerEnv(Env):
                             help="URL for rpc from lbrycrd or lbcd, "
                                  "<rpcuser>:<rpcpassword>@<lbrycrd rpc ip><lbrycrd rpc port>.",
                             default=env_daemon_url)
+        parser.add_argument('--daemon_ca_path', type=str, default='',
+                            help='Path to the lbcd ca file, used for lbcd with ssl')
         parser.add_argument('--host', type=str, default=cls.default('HOST', 'localhost'),
                             help="Interface for hub server to listen on, use 0.0.0.0 to listen on the external "
                                  "interface. Can be set in env with 'HOST'")
@@ -118,5 +121,5 @@ class ServerEnv(Env):
             database_query_timeout=args.query_timeout_ms, blocking_channel_ids=args.blocking_channel_ids,
             filtering_channel_ids=args.filtering_channel_ids, elastic_notifier_host=args.elastic_notifier_host,
             elastic_notifier_port=args.elastic_notifier_port, index_address_status=args.index_address_statuses,
-            address_history_cache_size=args.address_history_cache_size
+            address_history_cache_size=args.address_history_cache_size, daemon_ca_path=args.daemon_ca_path
         )
