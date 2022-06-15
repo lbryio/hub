@@ -6,7 +6,7 @@ Server Requirements (space requirements are at least double what's needed so it'
   - elasticsearch: 8 cores, 9gb of ram (8gb minimum given to ES), 150gb of SSD speed storage
   - hub: 8 cores, 32gb of ram, 200gb of NVMe storage
 
-All servers are assumed to be running ubuntu 20.04 with user named `lbry` with passwordless sudo and docker group permissions, ssh configured, ulimits set high, and docker + docker-compose installed. The server running elasticsearch should have swap disabled. The three servers need to be able to communicate with each other, they can be on a local network together or communicate over the internet. This guide will assume the three servers are on the internet.
+All servers are assumed to be running ubuntu 20.04 with user named `lbry` with passwordless sudo and docker group permissions, ssh configured, ulimits set high (in `/etc/security/limits.conf`, also see [this](https://unix.stackexchange.com/questions/366352/etc-security-limits-conf-not-applied/370652#370652) if the ulimit won't apply), and docker + docker-compose installed. The server running elasticsearch should have swap disabled. The three servers need to be able to communicate with each other, they can be on a local network together or communicate over the internet. This guide will assume the three servers are on the internet.
 
 ### Setting up the lbcd instance
 Log in to the lbcd instance and perform the following steps:
