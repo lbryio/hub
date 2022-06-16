@@ -10,7 +10,7 @@ services:
     depends_on:
       - lbcd
       - scribe_elastic_sync
-    image: lbry/hub:${SCRIBE_TAG:-latest}
+    image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always
     network_mode: host
     volumes:
@@ -26,7 +26,7 @@ services:
   scribe_elastic_sync:
     depends_on:
       - es01
-    image: lbry/hub:${SCRIBE_TAG:-latest}
+    image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always
     network_mode: host
     ports:
@@ -48,7 +48,7 @@ services:
       - lbcd
       - scribe_elastic_sync
       - scribe
-    image: lbry/hub:${SCRIBE_TAG:-latest}
+    image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always
     network_mode: host
     ports:

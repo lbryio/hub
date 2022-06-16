@@ -139,7 +139,7 @@ services:
   scribe:
     depends_on:
       - scribe_elastic_sync
-    image: lbry/hub:${SCRIBE_TAG:-development}
+    image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always
     network_mode: host
     volumes:
@@ -153,7 +153,7 @@ services:
       - "--cache_all_tx_hashes"
       - "--index_address_statuses"
   scribe_elastic_sync:
-    image: lbry/hub:${SCRIBE_TAG:-development}
+    image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always
     network_mode: host
     ports:
@@ -172,7 +172,7 @@ services:
     depends_on:
       - scribe_elastic_sync
       - scribe
-    image: lbry/hub:${SCRIBE_TAG:-development}
+    image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always
     network_mode: host
     ports:
