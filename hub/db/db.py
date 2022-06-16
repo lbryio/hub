@@ -942,7 +942,6 @@ class SecondaryDB:
         self.read_db_state()
 
         # These are our state as we move ahead of DB state
-        self.fs_height = self.db_height
         self.fs_tx_count = self.db_tx_count
         self.last_flush_tx_count = self.fs_tx_count
 

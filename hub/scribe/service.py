@@ -1396,7 +1396,6 @@ class BlockchainProcessorService(BlockchainService):
         self.db.block_hashes.append(self.env.coin.header_hash(block.header))
         self.tip = self.coin.header_hash(block.header)
 
-        self.db.fs_height = self.height
         self.db.fs_tx_count = self.tx_count
         self.db.hist_flush_count += 1
         self.db.hist_unflushed_count = 0
@@ -1591,10 +1590,9 @@ class BlockchainProcessorService(BlockchainService):
         # Not certain this is needed, but it doesn't hurt
         self.db.hist_flush_count += 1
 
-        while self.db.fs_height > self.height:
-            self.db.fs_height -= 1
+        while self.db.db_height > self.height:
+            self.db.db_height -= 1
         self.db.utxo_flush_count = self.db.hist_flush_count
-        self.db.db_height = self.height
         self.db.db_tx_count = self.tx_count
         self.db.db_tip = self.tip
         # Flush state last as it reads the wall time.
