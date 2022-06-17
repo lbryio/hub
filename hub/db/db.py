@@ -271,8 +271,8 @@ class SecondaryDB:
             for idx, partial_claim in needed_full_claim_hashes.items():
                 unique_full_claims[partial_claim].append(idx)
 
-            async for partial_claim, v in self.prefix_db.txo_to_claim.multi_get_async_gen(self._executor, list(unique_full_claims.keys())):
-                for idx in unique_full_claims[partial_claim]:
+            async for partial_claim_txo_k, v in self.prefix_db.txo_to_claim.multi_get_async_gen(self._executor, list(unique_full_claims.keys())):
+                for idx in unique_full_claims[partial_claim_txo_k]:
                     needed[idx] = None, v.claim_hash
 
         # fetch the winning claim hashes for the urls using winning resolution
@@ -318,7 +318,7 @@ class SecondaryDB:
         check_if_has_channel = set()
         resolved_urls = {}
 
-        urls_to_parts_mapping = {}
+        urls_to_parts_mapping = defaultdict(list)
         for url in urls:
             need_args = None
             try:
@@ -343,23 +343,28 @@ class SecondaryDB:
             if need_args:
                 needed.append(need_args)
                 url_parts_to_resolve[url] = need_args
-                urls_to_parts_mapping[need_args] = url
+                urls_to_parts_mapping[need_args].append(url)
 
         # collect the claim hashes for the outer layer claims in the urls
         outer_layer_claims = {
-            urls_to_parts_mapping[args]: claim_hash for args, claim_hash in zip(
+            claim_hash: urls_to_parts_mapping[args] for args, claim_hash in zip(
                 needed, await self._batch_resolve_parsed_urls(needed)
             )
         }
+        reverse_mapping_outer_layer_claims = {}
+        for claim_hash, _urls in outer_layer_claims.items():
+            for url in _urls:
+                reverse_mapping_outer_layer_claims[url] = claim_hash
 
         # needed_claims is a set of the total claim hashes to look up
-        needed_claims = set(claim_hash for claim_hash in outer_layer_claims.values() if claim_hash is not None)
-        for url, claim_hash in outer_layer_claims.items():
-            # if it's a stream not in a channel or is a bare channel then this claim is all that's needed for the url
-            if url not in needed_streams_in_channels:
-                if claim_hash:
-                    resolved_urls[url] = claim_hash
-                    needed_claims.add(claim_hash)
+        needed_claims = set(claim_hash for claim_hash in outer_layer_claims.keys() if claim_hash is not None)
+        for claim_hash, _urls in outer_layer_claims.items():
+            for url in _urls:
+                # if it's a stream not in a channel or is a bare channel then this claim is all that's needed for the url
+                if url not in needed_streams_in_channels:
+                    if claim_hash:
+                        resolved_urls[url] = claim_hash
+                        needed_claims.add(claim_hash)
 
         # check if any claims we've accumulated are in channels, add the channels to the set of needed claims
         if needed_claims:
@@ -383,7 +388,7 @@ class SecondaryDB:
 
         # add the stream claim hashes for urls with channel streams to the needed set
         for url, streams in needed_streams_in_channels.items():
-            resolved_channel_hash = outer_layer_claims.get(url)
+            resolved_channel_hash = reverse_mapping_outer_layer_claims.get(url)
             if not resolved_channel_hash:
                 continue
             for stream in streams:
