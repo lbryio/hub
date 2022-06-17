@@ -267,12 +267,13 @@ class SecondaryDB:
 
         # fetch the full claim hashes needed from urls with partial claim ids
         if needed_full_claim_hashes:
-            idxs = list(needed_full_claim_hashes.keys())
-            position = 0
-            async for _, v in self.prefix_db.txo_to_claim.multi_get_async_gen(self._executor, list(needed_full_claim_hashes.values())):
-                idx = idxs[position]
-                needed[idx] = None, v.claim_hash
-                position += 1
+            unique_full_claims = defaultdict(list)
+            for idx, partial_claim in needed_full_claim_hashes.items():
+                unique_full_claims[partial_claim].append(idx)
+
+            async for partial_claim, v in self.prefix_db.txo_to_claim.multi_get_async_gen(self._executor, list(unique_full_claims.keys())):
+                for idx in unique_full_claims[partial_claim]:
+                    needed[idx] = None, v.claim_hash
 
         # fetch the winning claim hashes for the urls using winning resolution
         needed_winning = list(set(normalized_name for normalized_name, _ in needed if normalized_name is not None))
