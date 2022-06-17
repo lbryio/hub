@@ -224,13 +224,18 @@ class ElasticSyncService(BlockchainReaderService):
 
         for idx in range(0, len(touched_claims), 1000):
             batch = touched_claims[idx:idx+1000]
-            async for claim_hash, claim, _ in self.db._prepare_resolve_results(batch, include_extra=False,
-                                                                               apply_blocking=False,
-                                                                               apply_filtering=False):
+            claims = {}
+            total_extras = {}
+            async for claim_hash, claim, extras in self.db._prepare_resolve_results(batch, include_extra=False,
+                                                                                    apply_blocking=False,
+                                                                                    apply_filtering=False):
                 if not claim:
                     self.log.warning("wat")
                     continue
-                claim = self.db._prepare_claim_metadata(claim.claim_hash, claim)
+                claims[claim_hash] = claim
+                total_extras[claim_hash] = claim
+                total_extras.update(extras)
+            async for claim in self.db.prepare_claim_metadata_batch(claims, total_extras):
                 if claim:
                     yield self._upsert_claim_query(self.index, claim)
 
@@ -418,22 +423,21 @@ class ElasticSyncService(BlockchainReaderService):
             self.log.info("finished reindexing")
 
     async def _sync_all_claims(self, batch_size=100000):
-        def load_historic_trending():
-            notifications = self._trending
-            for k, v in self.db.prefix_db.trending_notification.iterate():
-                notifications[k.claim_hash].append(TrendingNotification(k.height, v.previous_amount, v.new_amount))
-
         async def all_claims_producer():
+            current_height = self.db.db_height
             async for claim in self.db.all_claims_producer(batch_size=batch_size):
                 yield self._upsert_claim_query(self.index, claim)
-                claim_hash = bytes.fromhex(claim['claim_id'])
-                if claim_hash in self._trending:
-                    yield self._update_trending_query(self.index, claim_hash, self._trending.pop(claim_hash))
-            self._trending.clear()
 
-        self.log.info("loading about %i historic trending updates", self.db.prefix_db.trending_notification.estimate_num_keys())
-        await asyncio.get_event_loop().run_in_executor(self._executor, load_historic_trending)
-        self.log.info("loaded historic trending updates for %i claims", len(self._trending))
+            self.log.info("applying trending")
+
+            for batch_height in range(0, current_height, 10000):
+                notifications = defaultdict(list)
+                for k, v in self.db.prefix_db.trending_notification.iterate(start=(batch_height,), stop=(batch_height+10000,)):
+                    notifications[k.claim_hash].append(TrendingNotification(k.height, v.previous_amount, v.new_amount))
+
+                for claim_hash, trending in notifications.items():
+                    yield self._update_trending_query(self.index, claim_hash, trending)
+            self._trending.clear()
 
         cnt = 0
         success = 0

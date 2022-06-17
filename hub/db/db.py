@@ -832,6 +832,27 @@ class SecondaryDB:
             self.logger.exception("claim parsing for ES failed with tx: %s", tx_hash[::-1].hex())
             return
 
+    async def get_claim_metadatas(self, txos: List[Tuple[bytes, int]]):
+        tx_hashes = {tx_hash for tx_hash, _ in txos}
+        txs = {
+            k: self.coin.transaction(v) async for ((k,), v) in self.prefix_db.tx.multi_get_async_gen(
+                self._executor, [(tx_hash,) for tx_hash in tx_hashes], deserialize_value=False
+            )
+        }
+
+        def get_metadata(txo):
+            if not txo:
+                return
+            try:
+                return txo.metadata
+            except:
+                return
+
+        return {
+            (tx_hash, nout): get_metadata(txs[tx_hash].outputs[nout])
+            for (tx_hash, nout) in txos
+        }
+
     def get_activated_at_height(self, height: int) -> DefaultDict[PendingActivationValue, List[PendingActivationKey]]:
         activated = defaultdict(list)
         for k, v in self.prefix_db.pending_activation.iterate(prefix=(height,)):
