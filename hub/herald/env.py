@@ -51,7 +51,7 @@ class ServerEnv(Env):
         self.database_query_timeout = (database_query_timeout / 1000.0) if database_query_timeout is not None else \
             (float(self.integer('QUERY_TIMEOUT_MS', 10000)) / 1000.0)
         self.hashX_history_cache_size = address_history_cache_size if address_history_cache_size is not None \
-            else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 1000)
+            else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 4096)
         self.daemon_ca_path = daemon_ca_path if daemon_ca_path else None
 
     @classmethod
@@ -102,7 +102,7 @@ class ServerEnv(Env):
         parser.add_argument('--query_timeout_ms', type=int, default=cls.integer('QUERY_TIMEOUT_MS', 10000),
                             help="Elasticsearch query timeout, in ms. Can be set in env with 'QUERY_TIMEOUT_MS'")
         parser.add_argument('--address_history_cache_size', type=int,
-                            default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 1000),
+                            default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 4096),
                             help="Size of the lru cache of address histories. "
                                  "Can be set in the env with 'ADDRESS_HISTORY_CACHE_SIZE'")
 
