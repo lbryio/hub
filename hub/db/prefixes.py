@@ -1132,6 +1132,7 @@ class TXNumPrefixRow(PrefixRow):
         lambda: b'',
         struct.Struct(b'>32s').pack
     ]
+    cache_size = 1024 * 1024 * 64
 
     @classmethod
     def pack_key(cls, tx_hash: bytes) -> bytes:
@@ -1195,6 +1196,8 @@ class TXHashPrefixRow(PrefixRow):
         struct.Struct(b'>L').pack
     ]
 
+    cache_size = 1024 * 1024 * 64
+
     @classmethod
     def pack_key(cls, tx_num: int) -> bytes:
         return super().pack_key(tx_num)
@@ -1224,6 +1227,7 @@ class TXPrefixRow(PrefixRow):
         lambda: b'',
         struct.Struct(b'>32s').pack
     ]
+    cache_size = 1024 * 1024 * 64
 
     @classmethod
     def pack_key(cls, tx_hash: bytes) -> bytes:
