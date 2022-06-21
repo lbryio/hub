@@ -198,8 +198,7 @@ class SessionManager:
         self.cur_group = SessionGroup(0)
         self.txs_sent = 0
         self.start_time = time.time()
-        self.resolve_outputs_cache = {}
-        self.resolve_cache = {}
+        self.resolve_cache = LRUCacheWithMetrics(16384, metric_name='resolved_url', namespace=NAMESPACE)
         self.notified_height: typing.Optional[int] = None
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
@@ -220,7 +219,6 @@ class SessionManager:
         self.history_tx_info_cache = LRUCacheWithMetrics(2 ** 19, metric_name='history_tx', namespace=NAMESPACE)
 
     def clear_caches(self):
-        self.resolve_outputs_cache.clear()
         self.resolve_cache.clear()
 
     def update_history_caches(self, touched_hashXs: typing.List[bytes]):
@@ -1274,17 +1272,15 @@ class LBRYElectrumX(asyncio.Protocol):
             self.session_manager.executor_time_metric.observe(time.perf_counter() - start)
 
     async def claimtrie_resolve(self, *urls) -> str:
-        # sorted_urls = tuple(sorted(urls))
         self.session_manager.urls_to_resolve_count_metric.inc(len(urls))
         try:
-            # if sorted_urls in self.session_manager.resolve_outputs_cache:
-            #     return self.session_manager.resolve_outputs_cache[sorted_urls]
             rows, extra = [], []
             resolved = {}
             needed = defaultdict(list)
             for idx, url in enumerate(urls):
-                if url in self.session_manager.resolve_cache:
-                    stream, channel, repost, reposted_channel = self.session_manager.resolve_cache[url]
+                cached = self.session_manager.resolve_cache.get(url)
+                if cached:
+                    stream, channel, repost, reposted_channel = cached
                     resolved[url] = stream, channel, repost, reposted_channel
                 else:
                     needed[url].append(idx)
@@ -1321,9 +1317,7 @@ class LBRYElectrumX(asyncio.Protocol):
                         extra.append(repost)
                     if reposted_channel:
                         extra.append(reposted_channel)
-                # await asyncio.sleep(0)
 
-            # self.session_manager.resolve_outputs_cache[sorted_urls] = result = Outputs.to_base64(rows, extra)
             return Outputs.to_base64(rows, extra)
         finally:
             self.session_manager.resolved_url_count_metric.inc(len(urls))
