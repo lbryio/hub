@@ -13,7 +13,7 @@ class BlockchainEnv(Env):
         self.db_max_open_files = db_max_open_files
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
         self.hashX_history_cache_size = hashX_history_cache_size if hashX_history_cache_size is not None \
-            else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 1000)
+            else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 4096)
         self.rebuild_address_status_from_height = rebuild_address_status_from_height \
             if isinstance(rebuild_address_status_from_height, int) else -1
         self.daemon_ca_path = daemon_ca_path if daemon_ca_path else None
@@ -32,7 +32,7 @@ class BlockchainEnv(Env):
                             help='This setting translates into the max_open_files option given to rocksdb. '
                                  'A higher number will use more memory. Defaults to 64.')
         parser.add_argument('--address_history_cache_size', type=int,
-                            default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 2 ** 13),
+                            default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 4096),
                             help="LRU cache size for address histories, used when processing new blocks "
                                  "and when processing mempool updates. Can be set in env with "
                                  "'ADDRESS_HISTORY_CACHE_SIZE'")
