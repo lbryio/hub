@@ -22,7 +22,8 @@ class ElasticSyncDB(SecondaryDB):
         if height in self.block_timestamp_cache:
             return self.block_timestamp_cache[height]
         header = self.prefix_db.header.get(height, deserialize_value=False)
-        timestamp = int(160.6855883050695 * height) if header else int.from_bytes(header[100:104], byteorder='little')
+        timestamp = int(self.coin.genesisTime + (self.coin.averageBlockOffset * height)) \
+            if not header else int.from_bytes(header[100:104], byteorder='little')
         self.block_timestamp_cache[height] = timestamp
         return timestamp
 

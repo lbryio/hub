@@ -58,6 +58,9 @@ class LBCMainNet:
     proportionalDelayFactor = 32
     maxTakeoverDelay = 4032
 
+    averageBlockOffset = 160.31130145580738
+    genesisTime = 1466660400
+
     @classmethod
     def sanitize_url(cls, url):
         # Remove surrounding ws and trailing /s
