@@ -58,7 +58,10 @@ class LBCDaemon:
         ssl_context = None if not daemon_ca_path else ssl.create_default_context(
             purpose=ssl.Purpose.CLIENT_AUTH, capath=daemon_ca_path
         )
-        self.connector = aiohttp.TCPConnector(ssl=ssl_context is not None, ssl_context=ssl_context)
+        if ssl_context:
+            self.connector = aiohttp.TCPConnector(ssl_context=ssl_context)
+        else:
+            self.connector = aiohttp.TCPConnector(ssl=False)
         self._block_hash_cache = LRUCacheWithMetrics(1024)
         self._block_cache = LRUCacheWithMetrics(64, metric_name='block', namespace=NAMESPACE)
 
