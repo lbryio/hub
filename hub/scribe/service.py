@@ -40,6 +40,9 @@ class BlockchainProcessorService(BlockchainService):
     block_update_time_metric = Histogram(
         "block_time", "Block update times", namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
     )
+    mempool_update_time_metric = Histogram(
+        "mempool_time", "Block update times", namespace=NAMESPACE, buckets=HISTOGRAM_BUCKETS
+    )
     reorg_count_metric = Gauge(
         "reorg_count", "Number of reorgs", namespace=NAMESPACE
     )
@@ -1676,7 +1679,9 @@ class BlockchainProcessorService(BlockchainService):
                     break
                 if not blocks:
                     try:
+                        start_mempool_time = time.perf_counter()
                         await self.refresh_mempool()
+                        self.mempool_update_time_metric.observe(time.perf_counter() - start_mempool_time)
                     except asyncio.CancelledError:
                         raise
                     except Exception as err:
