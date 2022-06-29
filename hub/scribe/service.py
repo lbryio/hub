@@ -56,6 +56,7 @@ class BlockchainProcessorService(BlockchainService):
         self.wait_for_blocks_duration = 0.1
         self._ready_to_stop = asyncio.Event()
         self.blocks_event = asyncio.Event()
+        self.advanced = asyncio.Event()
         self.prefetcher = Prefetcher(self.daemon, env.coin, self.blocks_event)
         self._caught_up_event: Optional[asyncio.Event] = None
         self.height = 0
@@ -226,6 +227,7 @@ class BlockchainProcessorService(BlockchainService):
                             "applying extended claim expiration fork on claims accepted by, %i", self.height
                         )
                         await self.run_in_thread_with_lock(self.db.apply_expiration_extension_fork)
+                    self.advanced.set()
             except:
                 self.log.exception("advance blocks failed")
                 raise
@@ -270,6 +272,13 @@ class BlockchainProcessorService(BlockchainService):
             self.log.warning('daemon blocks do not form a chain; '
                                 'resetting the prefetcher')
             await self.prefetcher.reset_height(self.height)
+
+    async def wait_until_block(self, height: int):
+        while self.height < height:
+            await self.advanced.wait()
+            self.advanced.clear()
+            if self.height >= height:
+                break
 
     def _add_claim_or_update(self, height: int, txo: 'TxOutput', tx_hash: bytes, tx_num: int, nout: int,
                              spent_claims: typing.Dict[bytes, typing.Tuple[int, int, str]], first_input: 'TxInput'):
