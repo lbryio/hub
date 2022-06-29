@@ -30,6 +30,7 @@ class BlockchainService:
         self.last_state: typing.Optional[DBState] = None
         self.secondary_name = secondary_name
         self._stopping = False
+        self.prometheus_server: typing.Optional[PrometheusServer] = None
         self.db = None
         self.open_db()
 
@@ -41,6 +42,16 @@ class BlockchainService:
             filtering_channel_ids=env.filtering_channel_ids, executor=self._executor,
             index_address_status=env.index_address_status
         )
+
+    async def start_prometheus(self):
+        if not self.prometheus_server and self.env.prometheus_port:
+            self.prometheus_server = PrometheusServer()
+            await self.prometheus_server.start("0.0.0.0", self.env.prometheus_port)
+
+    async def stop_prometheus(self):
+        if self.prometheus_server:
+            await self.prometheus_server.stop()
+            self.prometheus_server = None
 
     def start_cancellable(self, run, *args):
         _flag = asyncio.Event()
@@ -131,7 +142,6 @@ class BlockchainReaderService(BlockchainService):
     def __init__(self, env, secondary_name: str, thread_workers: int = 1, thread_prefix: str = 'blockchain-reader'):
         super().__init__(env, secondary_name, thread_workers, thread_prefix)
         self._refresh_interval = 0.1
-        self.prometheus_server: typing.Optional[PrometheusServer] = None
         self.finished_initial_catch_up = asyncio.Event()
 
     async def poll_for_changes(self):
@@ -259,13 +269,3 @@ class BlockchainReaderService(BlockchainService):
     def _iter_stop_tasks(self):
         yield self.stop_prometheus()
         yield self._stop_cancellable_tasks()
-
-    async def start_prometheus(self):
-        if not self.prometheus_server and self.env.prometheus_port:
-            self.prometheus_server = PrometheusServer()
-            await self.prometheus_server.start("0.0.0.0", self.env.prometheus_port)
-
-    async def stop_prometheus(self):
-        if self.prometheus_server:
-            await self.prometheus_server.stop()
-            self.prometheus_server = None

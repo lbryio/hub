@@ -1729,6 +1729,7 @@ class BlockchainProcessorService(BlockchainService):
         await self.run_in_thread_with_lock(flush)
 
     def _iter_start_tasks(self):
+        yield self.start_prometheus()
         while self.db.db_version < max(self.db.DB_VERSIONS):
             if self.db.db_version == 7:
                 from hub.db.migrators.migrate7to8 import migrate, FROM_VERSION, TO_VERSION
@@ -1765,3 +1766,4 @@ class BlockchainProcessorService(BlockchainService):
         yield self._ready_to_stop.wait()
         yield self._stop_cancellable_tasks()
         yield self.daemon.close()
+        yield self.stop_prometheus()
