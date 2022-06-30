@@ -417,10 +417,19 @@ class SecondaryDB:
                     results[url] = ExpandedResolveResult(
                         None, LookupError(f'Could not find channel in "{url}".'), None, None
                     )
-                elif not isinstance(parsed, Exception) and (parsed.has_stream_in_channel or parsed.has_stream):
+                elif not isinstance(parsed, Exception) and not parsed.has_channel and parsed.has_stream:
                     results[url] = ExpandedResolveResult(
                         LookupError(f'Could not find claim at "{url}".'), None, None, None
                     )
+                elif not isinstance(parsed, Exception) and parsed.has_stream_in_channel:
+                    if reverse_mapping_outer_layer_claims.get(url) is None:
+                        results[url] = ExpandedResolveResult(
+                            None, LookupError(f'Could not find channel in "{url}".'), None, None
+                        )
+                    else:
+                        results[url] = ExpandedResolveResult(
+                            LookupError(f'Could not find claim at "{url}".'), None, None, None
+                        )
                 elif isinstance(parsed, ValueError):
                     results[url] = ExpandedResolveResult(
                         parsed, None, None, None
