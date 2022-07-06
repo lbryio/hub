@@ -196,3 +196,6 @@ services:
 ```
   - Start the hub services by running `docker-compose up -d`
   - Check the status with `docker-compose logs -f --tail 100`
+
+### Manual setup of docker volumes from snapshots
+  For an example of copying and configuring permissions for a hub docker volume, see [this](https://github.com/lbryio/hub/blob/master/scripts/initialize_rocksdb_snapshot_dev.sh). For an example for the elasticsearch volume, see [this](https://github.com/lbryio/hub/blob/master/scripts/initialize_es_snapshot_dev.sh). **Read these scripts before running them** to avoid overwriting the wrong volume, they are more of a guide on how to set the permissions and where files go than setup scripts.
