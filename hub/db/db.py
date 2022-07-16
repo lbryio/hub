@@ -40,7 +40,7 @@ class SecondaryDB:
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
                  blocking_channel_ids: List[str] = None,
                  filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
-                 index_address_status=False):
+                 index_address_status=False, merkle_cache_size=32768):
         self.logger = logging.getLogger(__name__)
         self.coin = coin
         self._executor = executor
@@ -92,7 +92,7 @@ class SecondaryDB:
         # lru cache of tx_hash: (tx_bytes, tx_num, position, tx_height)
         self.tx_cache = LRUCacheWithMetrics(2 ** 15, metric_name='tx', namespace=NAMESPACE)
         # lru cache of block heights to merkle trees of the block tx hashes
-        self.merkle_cache = LRUCacheWithMetrics(2 ** 14, metric_name='merkle', namespace=NAMESPACE)
+        self.merkle_cache = LRUCacheWithMetrics(merkle_cache_size, metric_name='merkle', namespace=NAMESPACE)
 
         # these are only used if the cache_all_tx_hashes setting is on
         self.total_transactions: List[bytes] = []
