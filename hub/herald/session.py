@@ -198,7 +198,9 @@ class SessionManager:
         self.cur_group = SessionGroup(0)
         self.txs_sent = 0
         self.start_time = time.time()
-        self.resolve_cache = LRUCacheWithMetrics(16384, metric_name='resolved_url', namespace=NAMESPACE)
+        self.resolve_cache = LRUCacheWithMetrics(
+            env.resolved_url_cache_size, metric_name='resolved_url', namespace=NAMESPACE
+        )
         self.notified_height: typing.Optional[int] = None
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
