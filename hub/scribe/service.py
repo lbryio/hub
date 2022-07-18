@@ -122,6 +122,9 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
+        # {claim_hash: <count>}
+        self.reposted_count_delta = defaultdict(int)
+
         self.hashX_history_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_history', NAMESPACE)
         self.hashX_full_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_full', NAMESPACE)
         self.history_tx_info_cache = LFUCacheWithMetrics(max(100, env.history_tx_cache_size), 'hashX_tx', NAMESPACE)
@@ -307,6 +310,7 @@ class BlockchainProcessorService(BlockchainService):
             if is_repost:
                 reposted_claim_hash = signable.repost.reference.claim_hash[::-1]
                 self.pending_reposted.add(reposted_claim_hash)
+                self.reposted_count_delta[reposted_claim_hash] += 1
             is_channel = signable.is_channel
             if is_channel:
                 self.pending_channels[claim_hash] = signable.channel.public_key_bytes
@@ -477,6 +481,7 @@ class BlockchainProcessorService(BlockchainService):
             self.db.prefix_db.reposted_claim.stage_delete(
                 (pending.reposted_claim_hash, pending.tx_num, pending.position), (pending.claim_hash,)
             )
+            self.reposted_count_delta[pending.reposted_claim_hash] -= 1
 
     def _add_support(self, height: int, txo: 'TxOutput', tx_num: int, nout: int):
         supported_claim_hash = txo.support.claim_hash[::-1]
@@ -1163,6 +1168,28 @@ class BlockchainProcessorService(BlockchainService):
                  if claim_hash not in self.abandoned_claims}
             )
 
+        # update the reposted counts
+        reposted_to_check = [(claim_hash,) for claim_hash, delta in self.reposted_count_delta.items() if delta != 0]
+        existing_repost_counts = {}
+        if reposted_to_check:
+            existing_repost_counts.update({
+                claim_hash: v.reposted_count
+                for (claim_hash,), v in zip(reposted_to_check, self.db.prefix_db.reposted_count.multi_get(
+                    reposted_to_check
+                )) if v is not None
+            })
+        if existing_repost_counts:
+            self.db.prefix_db.multi_delete([
+                self.db.prefix_db.reposted_count.pack_item(claim_hash, count)
+                for claim_hash, count in existing_repost_counts.items()
+            ])
+        repost_count_puts = []
+        for claim_hash, delta in self.reposted_count_delta.items():
+            if delta != 0:
+                new_count = existing_repost_counts.get(claim_hash, 0) + delta
+                repost_count_puts.append(((claim_hash,), (new_count,)))
+        self.db.prefix_db.reposted_count.stage_multi_put(repost_count_puts)
+
         # gather cumulative removed/touched sets to update the search index
         self.removed_claim_hashes.update(set(self.abandoned_claims.keys()))
         self.touched_claim_hashes.difference_update(self.removed_claim_hashes)
@@ -1558,6 +1585,7 @@ class BlockchainProcessorService(BlockchainService):
         self.mempool.clear()
         self.hashX_history_cache.clear()
         self.hashX_full_cache.clear()
+        self.reposted_count_delta.clear()
 
     def backup_block(self):
         assert len(self.db.prefix_db._op_stack) == 0

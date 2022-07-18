@@ -116,9 +116,10 @@ class SecondaryDB:
         return
 
     def get_reposted_count(self, claim_hash: bytes) -> int:
-        return sum(
-            1 for _ in self.prefix_db.reposted_claim.iterate(prefix=(claim_hash,), include_value=False)
-        )
+        v = self.prefix_db.reposted_count.get(claim_hash)
+        if v:
+            return v.reposted_count
+        return 0
 
     def get_activation(self, tx_num, position, is_support=False) -> int:
         activation = self.prefix_db.activated.get(
@@ -632,11 +633,12 @@ class SecondaryDB:
             )
         }
 
+        # collect all of the repost counts
         repost_counts = {
-            claim_hash: await run_in_executor(
-                self._executor, self.get_reposted_count, claim_hash
+            claim_hash: 0 if not v else v.reposted_count
+            async for (claim_hash, ), v in self.prefix_db.reposted_count.multi_get_async_gen(
+                self._executor, [(claim_hash,) for claim_hash in claims]
             )
-            for claim_hash, claim in claims.items() if claim is not None
         }
 
         effective_amounts = {
