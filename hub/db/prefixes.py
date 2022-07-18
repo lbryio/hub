@@ -1025,6 +1025,44 @@ class RepostedPrefixRow(PrefixRow):
         return cls.pack_key(reposted_claim_hash, tx_num, position), cls.pack_value(claim_hash)
 
 
+class RepostedCountKey(NamedTuple):
+    claim_hash: bytes
+
+
+class RepostedCountValue(NamedTuple):
+    reposted_count: int
+
+
+class RepostedCountPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.reposted_count.value
+    key_struct = struct.Struct(b'>20s')
+    value_struct = struct.Struct(b'>L')
+    key_part_lambdas = [
+        lambda: b'',
+        struct.Struct(b'>20s').pack,
+    ]
+
+    @classmethod
+    def pack_key(cls, claim_hash: bytes):
+        return super().pack_key(claim_hash)
+
+    @classmethod
+    def unpack_key(cls, key: bytes) -> RepostedCountKey:
+        return RepostedCountKey(*super().unpack_key(key))
+
+    @classmethod
+    def pack_value(cls, reposted_count: int) -> bytes:
+        return super().pack_value(reposted_count)
+
+    @classmethod
+    def unpack_value(cls, data: bytes) -> RepostedCountValue:
+        return RepostedCountValue(*super().unpack_value(data))
+
+    @classmethod
+    def pack_item(cls, claim_hash: bytes, reposted_count: int):
+        return cls.pack_key(claim_hash), cls.pack_value(reposted_count)
+
+
 class UndoKey(NamedTuple):
     height: int
     block_hash: bytes
@@ -1753,6 +1791,7 @@ class PrefixDB(BasePrefixDB):
         self.effective_amount = EffectiveAmountPrefixRow(db, self._op_stack)
         self.repost = RepostPrefixRow(db, self._op_stack)
         self.reposted_claim = RepostedPrefixRow(db, self._op_stack)
+        self.reposted_count = RepostedCountPrefixRow(db, self._op_stack)
         self.undo = UndoPrefixRow(db, self._op_stack)
         self.utxo = UTXOPrefixRow(db, self._op_stack)
         self.hashX_utxo = HashXUTXOPrefixRow(db, self._op_stack)
