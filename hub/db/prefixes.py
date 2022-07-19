@@ -354,14 +354,14 @@ class ActiveAmountValue(typing.NamedTuple):
     amount: int
 
 
-class EffectiveAmountKey(typing.NamedTuple):
+class BidOrderKey(typing.NamedTuple):
     normalized_name: str
     effective_amount: int
     tx_num: int
     position: int
 
 
-class EffectiveAmountValue(typing.NamedTuple):
+class BidOrderValue(typing.NamedTuple):
     claim_hash: bytes
 
     def __str__(self):
@@ -923,8 +923,8 @@ def effective_amount_helper(struct_fmt):
     return wrapper
 
 
-class EffectiveAmountPrefixRow(PrefixRow):
-    prefix = DB_PREFIXES.effective_amount.value
+class BidOrderPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.bid_order.value
     key_struct = struct.Struct(b'>QLH')
     value_struct = struct.Struct(b'>20s')
     key_part_lambdas = [
@@ -943,16 +943,16 @@ class EffectiveAmountPrefixRow(PrefixRow):
         )
 
     @classmethod
-    def unpack_key(cls, key: bytes) -> EffectiveAmountKey:
+    def unpack_key(cls, key: bytes) -> BidOrderKey:
         assert key[:1] == cls.prefix
         name_len = int.from_bytes(key[1:3], byteorder='big')
         name = key[3:3 + name_len].decode()
         ones_comp_effective_amount, tx_num, position = cls.key_struct.unpack(key[3 + name_len:])
-        return EffectiveAmountKey(name, 0xffffffffffffffff - ones_comp_effective_amount, tx_num, position)
+        return BidOrderKey(name, 0xffffffffffffffff - ones_comp_effective_amount, tx_num, position)
 
     @classmethod
-    def unpack_value(cls, data: bytes) -> EffectiveAmountValue:
-        return EffectiveAmountValue(*super().unpack_value(data))
+    def unpack_value(cls, data: bytes) -> BidOrderValue:
+        return BidOrderValue(*super().unpack_value(data))
 
     @classmethod
     def pack_value(cls, claim_hash: bytes) -> bytes:
@@ -1788,7 +1788,7 @@ class PrefixDB(BasePrefixDB):
         self.pending_activation = PendingActivationPrefixRow(db, self._op_stack)
         self.activated = ActivatedPrefixRow(db, self._op_stack)
         self.active_amount = ActiveAmountPrefixRow(db, self._op_stack)
-        self.effective_amount = EffectiveAmountPrefixRow(db, self._op_stack)
+        self.bid_order = BidOrderPrefixRow(db, self._op_stack)
         self.repost = RepostPrefixRow(db, self._op_stack)
         self.reposted_claim = RepostedPrefixRow(db, self._op_stack)
         self.reposted_count = RepostedCountPrefixRow(db, self._op_stack)
