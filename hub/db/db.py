@@ -22,7 +22,7 @@ from hub.common import hash_to_hex_str, LRUCacheWithMetrics, LFUCacheWithMetrics
 from hub.db.merkle import Merkle, MerkleCache, FastMerkleCacheItem
 from hub.db.common import ResolveResult, ExpandedResolveResult, DBError, UTXO
 from hub.db.prefixes import PendingActivationValue, ClaimTakeoverValue, ClaimToTXOValue, PrefixDB
-from hub.db.prefixes import ACTIVATED_CLAIM_TXO_TYPE, ACTIVATED_SUPPORT_TXO_TYPE, EffectiveAmountKey
+from hub.db.prefixes import ACTIVATED_CLAIM_TXO_TYPE, ACTIVATED_SUPPORT_TXO_TYPE, BidOrderKey
 from hub.db.prefixes import PendingActivationKey, TXOToClaimValue, DBStatePrefixRow, MempoolTXPrefixRow
 from hub.db.prefixes import HashXMempoolStatusPrefixRow
 
@@ -235,7 +235,7 @@ class SecondaryDB:
         def get_claim_by_amount(normalized: str, order: int):
             order = max(int(order or 1), 1)
 
-            for _idx, (key, claim_val) in enumerate(self.prefix_db.effective_amount.iterate(prefix=(normalized,))):
+            for _idx, (key, claim_val) in enumerate(self.prefix_db.bid_order.iterate(prefix=(normalized,))):
                 if order > _idx + 1:
                     continue
                 return claim_val.claim_hash
@@ -512,8 +512,8 @@ class SecondaryDB:
             claim_hash, ACTIVATED_SUPPORT_TXO_TYPE, self.db_height + 1
         ) + self._get_active_amount(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, self.db_height + 1)
 
-    def get_url_effective_amount(self, name: str, claim_hash: bytes) -> Optional['EffectiveAmountKey']:
-        for k, v in self.prefix_db.effective_amount.iterate(prefix=(name,)):
+    def get_url_effective_amount(self, name: str, claim_hash: bytes) -> Optional['BidOrderKey']:
+        for k, v in self.prefix_db.bid_order.iterate(prefix=(name,)):
             if v.claim_hash == claim_hash:
                 return k
 

@@ -1230,9 +1230,10 @@ class BlockchainProcessorService(BlockchainService):
                     removed_claim.normalized_name, removed
                 )
                 if amt:
-                    self.db.prefix_db.effective_amount.stage_delete(
+                    self.db.prefix_db.bid_order.stage_delete(
                         (removed_claim.normalized_name, amt.effective_amount, amt.tx_num, amt.position), (removed,)
                     )
+
         for touched in self.touched_claim_hashes:
             prev_effective_amount = 0
 
@@ -1244,7 +1245,7 @@ class BlockchainProcessorService(BlockchainService):
                     claim_amount_info = self.db.get_url_effective_amount(name, touched)
                     if claim_amount_info:
                         prev_effective_amount = claim_amount_info.effective_amount
-                        self.db.prefix_db.effective_amount.stage_delete(
+                        self.db.prefix_db.bid_order.stage_delete(
                             (name, claim_amount_info.effective_amount, claim_amount_info.tx_num,
                              claim_amount_info.position), (touched,)
                         )
@@ -1256,12 +1257,12 @@ class BlockchainProcessorService(BlockchainService):
                 amt = self.db.get_url_effective_amount(name, touched)
                 if amt:
                     prev_effective_amount = amt.effective_amount
-                    self.db.prefix_db.effective_amount.stage_delete(
+                    self.db.prefix_db.bid_order.stage_delete(
                         (name, prev_effective_amount, amt.tx_num, amt.position), (touched,)
                     )
 
             new_effective_amount = self._get_pending_effective_amount(name, touched)
-            self.db.prefix_db.effective_amount.stage_put(
+            self.db.prefix_db.bid_order.stage_put(
                 (name, new_effective_amount, tx_num, position), (touched,)
             )
             if touched in self.claim_hash_to_txo or touched in self.removed_claim_hashes \
