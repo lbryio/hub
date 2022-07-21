@@ -508,9 +508,10 @@ class SecondaryDB:
         return 0
 
     def get_effective_amount(self, claim_hash: bytes) -> int:
-        return self._get_active_amount(
-            claim_hash, ACTIVATED_SUPPORT_TXO_TYPE, self.db_height + 1
-        ) + self._get_active_amount(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, self.db_height + 1)
+        v = self.prefix_db.effective_amount.get(claim_hash)
+        if v:
+            return v.effective_amount
+        return 0
 
     def get_url_effective_amount(self, name: str, claim_hash: bytes) -> Optional['BidOrderKey']:
         for k, v in self.prefix_db.bid_order.iterate(prefix=(name,)):
@@ -641,11 +642,12 @@ class SecondaryDB:
             )
         }
 
+        # collect all of the effective amounts
         effective_amounts = {
-            claim_hash: await run_in_executor(
-                self._executor, self.get_effective_amount, claim_hash
+            claim_hash: 0 if not v else v.effective_amount
+            async for (claim_hash, ), v in self.prefix_db.effective_amount.multi_get_async_gen(
+                self._executor, [(claim_hash,) for claim_hash in claims]
             )
-            for claim_hash, claim in claims.items() if claim is not None
         }
 
         censoring_reasons = {}

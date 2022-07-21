@@ -1770,6 +1770,45 @@ class HashXMempoolStatusPrefixRow(PrefixRow):
         return cls.pack_key(hashX), cls.pack_value(status)
 
 
+class EffectiveAmountKey(NamedTuple):
+    claim_hash: bytes
+
+
+class EffectiveAmountValue(NamedTuple):
+    effective_amount: int
+
+
+class EffectiveAmountPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.effective_amount.value
+    key_struct = struct.Struct(b'>20s')
+    value_struct = struct.Struct(b'>Q')
+
+    key_part_lambdas = [
+        lambda: b'',
+        struct.Struct(b'>20s').pack
+    ]
+
+    @classmethod
+    def pack_key(cls, claim_hash: bytes):
+        return super().pack_key(claim_hash)
+
+    @classmethod
+    def unpack_key(cls, key: bytes) -> EffectiveAmountKey:
+        return EffectiveAmountKey(*super().unpack_key(key))
+
+    @classmethod
+    def pack_value(cls, effective_amount: int) -> bytes:
+        return super().pack_value(effective_amount)
+
+    @classmethod
+    def unpack_value(cls, data: bytes) -> EffectiveAmountValue:
+        return EffectiveAmountValue(*cls.value_struct.unpack(data))
+
+    @classmethod
+    def pack_item(cls, claim_hash: bytes,  effective_amount: int):
+        return cls.pack_key(claim_hash), cls.pack_value(effective_amount)
+
+
 class PrefixDB(BasePrefixDB):
     def __init__(self, path: str, reorg_limit: int = 200, max_open_files: int = 64,
                  secondary_path: str = '', unsafe_prefixes: Optional[typing.Set[bytes]] = None):
@@ -1812,6 +1851,7 @@ class PrefixDB(BasePrefixDB):
         self.touched_hashX = TouchedHashXPrefixRow(db, self._op_stack)
         self.hashX_status = HashXStatusPrefixRow(db, self._op_stack)
         self.hashX_mempool_status = HashXMempoolStatusPrefixRow(db, self._op_stack)
+        self.effective_amount = EffectiveAmountPrefixRow(db, self._op_stack)
 
 
 def auto_decode_item(key: bytes, value: bytes) -> Union[Tuple[NamedTuple, NamedTuple], Tuple[bytes, bytes]]:
