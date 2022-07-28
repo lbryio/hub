@@ -11,7 +11,7 @@ from hub import PROMETHEUS_NAMESPACE
 from hub.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from hub.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
 from hub.error.base import ChainError
-from hub.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256, LFUCache, LRUCache
+from hub.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256, LFUCache, LFUCacheWithMetrics
 from hub.scribe.db import PrimaryDB
 from hub.scribe.daemon import LBCDaemon
 from hub.scribe.transaction import Tx, TxOutput, TxInput, Block
@@ -122,9 +122,9 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_transaction_num_mapping: Dict[bytes, int] = {}
         self.pending_transactions: Dict[int, bytes] = {}
 
-        self.hashX_history_cache = LFUCache(max(100, env.hashX_history_cache_size))
-        self.hashX_full_cache = LFUCache(max(100, env.hashX_history_cache_size))
-        self.history_tx_info_cache = LFUCache(2 ** 17)
+        self.hashX_history_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_history', NAMESPACE)
+        self.hashX_full_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_full', NAMESPACE)
+        self.history_tx_info_cache = LFUCacheWithMetrics(max(100, env.history_tx_cache_size), 'hashX_tx', NAMESPACE)
 
     def open_db(self):
         env = self.env
@@ -1274,8 +1274,9 @@ class BlockchainProcessorService(BlockchainService):
         append_needed_tx_info = needed_tx_infos.append
         tx_infos = {}
         for tx_num in tx_nums:
-            if tx_num in self.history_tx_info_cache:
-                tx_infos[tx_num] = self.history_tx_info_cache[tx_num]
+            cached_tx_info = self.history_tx_info_cache.get(tx_num)
+            if cached_tx_info is not None:
+                tx_infos[tx_num] = cached_tx_info
             else:
                 append_needed_tx_info(tx_num)
         if needed_tx_infos:
@@ -1502,8 +1503,9 @@ class BlockchainProcessorService(BlockchainService):
             append_needed_tx_info = needed_tx_infos.append
             tx_infos = {}
             for tx_num in tx_nums:
-                if tx_num in self.history_tx_info_cache:
-                    tx_infos[tx_num] = self.history_tx_info_cache[tx_num]
+                cached_tx_info = self.history_tx_info_cache.get(tx_num)
+                if cached_tx_info is not None:
+                    tx_infos[tx_num] = cached_tx_info
                 else:
                     append_needed_tx_info(tx_num)
             if needed_tx_infos:
