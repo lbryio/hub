@@ -23,7 +23,7 @@ from hub.build_info import BUILD, COMMIT_HASH, DOCKER_TAG
 from hub.herald.search import SearchIndex
 from hub.common import sha256, hash_to_hex_str, hex_str_to_hash, HASHX_LEN, version_string, formatted_time, SIZE_BUCKETS
 from hub.common import protocol_version, RPCError, DaemonError, TaskGroup, HISTOGRAM_BUCKETS, asyncify_for_loop
-from hub.common import LRUCacheWithMetrics
+from hub.common import LRUCacheWithMetrics, LFUCacheWithMetrics
 from hub.herald.jsonrpc import JSONRPCAutoDetect, JSONRPCConnection, JSONRPCv2, JSONRPC
 from hub.herald.common import BatchRequest, ProtocolError, Request, Batch, Notification
 from hub.herald.framer import NewlineFramer
@@ -214,11 +214,11 @@ class SessionManager:
         )
         self.running = False
         # hashX: List[int]
-        self.hashX_raw_history_cache = LRUCacheWithMetrics(2 ** 16, metric_name='raw_history', namespace=NAMESPACE)
+        self.hashX_raw_history_cache = LFUCacheWithMetrics(2 ** 16, metric_name='raw_history', namespace=NAMESPACE)
         # hashX: List[CachedAddressHistoryItem]
-        self.hashX_history_cache = LRUCacheWithMetrics(2 ** 14, metric_name='full_history', namespace=NAMESPACE)
+        self.hashX_history_cache = LFUCacheWithMetrics(2 ** 14, metric_name='full_history', namespace=NAMESPACE)
         # tx_num: Tuple[txid, height]
-        self.history_tx_info_cache = LRUCacheWithMetrics(2 ** 19, metric_name='history_tx', namespace=NAMESPACE)
+        self.history_tx_info_cache = LFUCacheWithMetrics(2 ** 17, metric_name='history_tx', namespace=NAMESPACE)
 
     def clear_caches(self):
         self.resolve_cache.clear()
@@ -246,8 +246,9 @@ class SessionManager:
             total_tx_nums = list(total_tx_nums)
             # collect the total new tx infos
             referenced_new_txs = {
-                tx_num: (CachedAddressHistoryItem(tx_hash=tx_hash[::-1].hex(), height=bisect_right(self.db.tx_counts, tx_num)))
-                for tx_num, tx_hash in zip(total_tx_nums, self.db._get_tx_hashes(total_tx_nums))
+                tx_num: (CachedAddressHistoryItem(
+                    tx_hash=tx_hash[::-1].hex(), height=bisect_right(self.db.tx_counts, tx_num)
+                )) for tx_num, tx_hash in zip(total_tx_nums, self.db._get_tx_hashes(total_tx_nums))
             }
             # update the cached history lists
             get_referenced = referenced_new_txs.__getitem__

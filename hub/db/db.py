@@ -18,7 +18,7 @@ from hub.schema.url import URL, normalize_name
 from hub.schema.claim import guess_stream_type
 from hub.schema.result import Censor
 from hub.scribe.transaction import TxInput
-from hub.common import hash_to_hex_str, LRUCacheWithMetrics
+from hub.common import hash_to_hex_str, LRUCacheWithMetrics, LFUCacheWithMetrics
 from hub.db.merkle import Merkle, MerkleCache, FastMerkleCacheItem
 from hub.db.common import ResolveResult, ExpandedResolveResult, DBError, UTXO
 from hub.db.prefixes import PendingActivationValue, ClaimTakeoverValue, ClaimToTXOValue, PrefixDB
@@ -90,9 +90,9 @@ class SecondaryDB:
         self.header_mc = MerkleCache(self.merkle, self.fs_block_hashes)
 
         # lru cache of tx_hash: (tx_bytes, tx_num, position, tx_height)
-        self.tx_cache = LRUCacheWithMetrics(tx_cache_size, metric_name='tx', namespace=NAMESPACE)
+        self.tx_cache = LFUCacheWithMetrics(tx_cache_size, metric_name='tx', namespace=NAMESPACE)
         # lru cache of block heights to merkle trees of the block tx hashes
-        self.merkle_cache = LRUCacheWithMetrics(merkle_cache_size, metric_name='merkle', namespace=NAMESPACE)
+        self.merkle_cache = LFUCacheWithMetrics(merkle_cache_size, metric_name='merkle', namespace=NAMESPACE)
 
         # these are only used if the cache_all_tx_hashes setting is on
         self.total_transactions: List[bytes] = []
