@@ -204,7 +204,7 @@ class SessionManager:
         self.notified_height: typing.Optional[int] = None
         # Cache some idea of room to avoid recounting on each subscription
         self.subs_room = 0
-
+        self.protocol_class = LBRYElectrumX
         self.session_event = Event()
 
         # Search index
@@ -262,7 +262,7 @@ class SessionManager:
         loop = asyncio.get_event_loop()
 
         if kind == 'TCP':
-            protocol_class = LBRYElectrumX
+            protocol_class = self.protocol_class
         else:
             raise ValueError(kind)
         protocol_factory = partial(protocol_class, self, kind)
