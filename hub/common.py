@@ -279,6 +279,211 @@ class LRUCache:
         self.clear()
 
 
+class LinkedList:
+    __slots__ = [
+        'head',
+        'tail',
+        'size'
+    ]
+
+    def __init__(self):
+        self.head = self.tail = None
+        self.size = 0
+
+    def __len__(self):
+        return self.size
+
+    def __iter__(self):
+        node = self.head
+        while node is not None:
+            yield node
+            node = node.next
+        return
+
+    def clear(self):
+        while self.size > 0:
+            self.remove(self.tail)
+        return
+
+    def append(self, node):
+        if self.size == 0:
+            self.head = self.tail = node
+        else:
+            self.tail.next, node.previous, self.tail = node, self.tail, node
+        self.size += 1
+
+    def prepend(self, node):
+        if self.size == 0:
+            self.head = self.tail = node
+        else:
+            self.head.previous, node.next, self.head = node, self.head, node
+        self.size += 1
+
+    def insert_after(self, ref_node, node):
+        ref_node_next, node.next, ref_node.next, node.previous = ref_node.next, ref_node.next, node, ref_node
+        if ref_node_next:
+            ref_node_next.previous = node
+        if self.tail is ref_node:
+            self.tail = node
+        self.size += 1
+
+    def remove(self, node):
+        if self.tail is node:
+            self.tail = node.previous
+        if self.head is node:
+            self.head = node.next
+        if node.previous:
+            node.previous.next = node.next
+        if node.next:
+            node.next.previous = node.previous
+        node.next = node.previous = None
+
+        self.size -= 1
+
+
+class WeightNode:
+    __slots__ = [
+        'previous',
+        'next',
+        'weight',
+        'cache_nodes'
+    ]
+
+    def __init__(self, weight):
+        self.previous = self.next = None
+        self.weight = weight
+        self.cache_nodes = LinkedList()
+
+
+class CacheNode:
+    __slots__ = [
+        'previous',
+        'next',
+        'key',
+        'value',
+        'weight_node'
+    ]
+
+    def __init__(self, key, value, weight_node: WeightNode):
+        self.previous = self.next = None
+        self.key = key
+        self.value = value
+        self.weight_node = weight_node
+
+
+class LFUCache:
+    def __init__(self, capacity: int):
+        self.cache = {}
+        self.weights = LinkedList()
+        self.capacity = capacity
+
+    def increment_weight(self, cache_node: CacheNode):
+        weight_node = cache_node.weight_node
+        weight = weight_node.weight
+        if not (weight_node.next and weight_node.next.weight == weight + 1):
+            self.weights.insert_after(weight_node, WeightNode(weight=weight + 1))
+        weight_node.cache_nodes.remove(cache_node)
+        weight_node.next.cache_nodes.append(cache_node)
+        cache_node.weight_node = weight_node.next
+        if weight_node.cache_nodes.size == 0:
+            self.weights.remove(weight_node)
+
+    def set(self, key, value):
+        if key in self.cache:
+            data_node = self.cache[key]
+            self.increment_weight(data_node)
+            data_node.value = value
+            return
+        if len(self.cache) == self.capacity:
+            if self.capacity == 0:
+                return
+            lowest_data_list = self.weights.head.cache_nodes
+            to_remove = lowest_data_list.head
+            lowest_data_list.remove(to_remove)
+            self.cache.pop(to_remove.key)
+            if lowest_data_list.size == 0:
+                self.weights.remove(self.weights.head)
+        if not (self.weights.head and self.weights.head.weight == 1):
+            self.weights.prepend(WeightNode(1))
+        new_cache_node = CacheNode(key=key, value=value, weight_node=self.weights.head)
+        self.weights.head.cache_nodes.append(new_cache_node)
+        self.cache[key] = new_cache_node
+
+    def get(self, key):
+        if key in self.cache:
+            item = self.cache[key]
+            self.increment_weight(item)
+            return item.value
+
+    def __len__(self):
+        return len(self.cache)
+
+    def __getitem__(self, item):
+        return self.get(item)
+
+    def __setitem__(self, key, value):
+        return self.set(key, value)
+
+    def items(self):
+        return self.cache.items()
+
+    def clear(self):
+        self.cache.clear()
+        self.weights.clear()
+
+    def pop(self, key):
+        cache_node = self.cache.pop(key)
+        weight_node = cache_node.weight_node
+        weight_node.cache_nodes.remove(cache_node)
+        if weight_node.cache_nodes.size == 0:
+            self.weights.remove(weight_node)
+
+    def __contains__(self, item) -> bool:
+        return item in self.cache
+
+    def __delitem__(self, key):
+        item = self.cache.pop(key)
+        weight_node = item.weight_node
+        weight_node.cache_nodes.remove(item)
+        if weight_node.cache_nodes.size == 0:
+            self.weights.remove(weight_node)
+
+    def __del__(self):
+        self.clear()
+
+
+class LFUCacheWithMetrics(LFUCache):
+    def __init__(self, capacity: int, metric_name: typing.Optional[str] = None, namespace: str = "daemon_cache"):
+        super().__init__(capacity)
+        if metric_name is None:
+            self._track_metrics = False
+            self.hits = self.misses = None
+        else:
+            self._track_metrics = True
+            try:
+                self.hits = Counter(
+                    f"{metric_name}_cache_hit_count", "Number of cache hits", namespace=namespace
+                )
+                self.misses = Counter(
+                    f"{metric_name}_cache_miss_count", "Number of cache misses", namespace=namespace
+                )
+            except ValueError as err:
+                log.debug("failed to set up prometheus %s_cache_miss_count metric: %s", metric_name, err)
+                self._track_metrics = False
+                self.hits = self.misses = None
+
+    def get(self, key):
+        # Key exists, assign it to a next freq_node
+        if key in self.cache:
+            item = self.cache[key]
+            self.increment_weight(item)
+            if self._track_metrics:
+                self.hits.inc()
+            return item.value
+        if self._track_metrics:
+            self.misses.inc()
+
+
 # the ipaddress module does not show these subnets as reserved
 CARRIER_GRADE_NAT_SUBNET = ipaddress.ip_network('100.64.0.0/10')
 IPV4_TO_6_RELAY_SUBNET = ipaddress.ip_network('192.88.99.0/24')
