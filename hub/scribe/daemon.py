@@ -62,7 +62,7 @@ class LBCDaemon:
             self.connector = aiohttp.TCPConnector(ssl_context=ssl_context)
         else:
             self.connector = aiohttp.TCPConnector(ssl=False)
-        self._block_hash_cache = LRUCacheWithMetrics(1024)
+        self._block_hash_cache = LRUCacheWithMetrics(1024, metric_name='block_hash', namespace=NAMESPACE)
         self._block_cache = LRUCacheWithMetrics(64, metric_name='block', namespace=NAMESPACE)
 
     async def close(self):

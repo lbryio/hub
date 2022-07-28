@@ -7,7 +7,7 @@ class BlockchainEnv(Env):
                  blocking_channel_ids=None, filtering_channel_ids=None,
                  db_max_open_files=64, daemon_url=None, hashX_history_cache_size=None,
                  index_address_status=None, rebuild_address_status_from_height=None,
-                 daemon_ca_path=None):
+                 daemon_ca_path=None, history_tx_cache_size=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
                          cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.db_max_open_files = db_max_open_files
@@ -17,6 +17,8 @@ class BlockchainEnv(Env):
         self.rebuild_address_status_from_height = rebuild_address_status_from_height \
             if isinstance(rebuild_address_status_from_height, int) else -1
         self.daemon_ca_path = daemon_ca_path if daemon_ca_path else None
+        self.history_tx_cache_size = history_tx_cache_size if history_tx_cache_size is not None else \
+            self.integer('HISTORY_TX_CACHE_SIZE', 262144)
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
@@ -39,6 +41,10 @@ class BlockchainEnv(Env):
         parser.add_argument('--rebuild_address_status_from_height', type=int, default=-1,
                             help="Rebuild address statuses, set to 0 to reindex all address statuses or provide a "
                                  "block height to start reindexing from. Defaults to -1 (off).")
+        parser.add_argument('--history_tx_cache_size', type=int,
+                            default=cls.integer('HISTORY_TX_CACHE_SIZE', 262144),
+                            help="Size of the lfu cache of txids in transaction histories for addresses. "
+                                 "Can be set in the env with 'TX_CACHE_SIZE'")
 
     @classmethod
     def from_arg_parser(cls, args):
@@ -49,5 +55,5 @@ class BlockchainEnv(Env):
             cache_all_claim_txos=args.cache_all_claim_txos, index_address_status=args.index_address_statuses,
             hashX_history_cache_size=args.address_history_cache_size,
             rebuild_address_status_from_height=args.rebuild_address_status_from_height,
-            daemon_ca_path=args.daemon_ca_path
+            daemon_ca_path=args.daemon_ca_path, history_tx_cache_size=args.history_tx_cache_size
         )
