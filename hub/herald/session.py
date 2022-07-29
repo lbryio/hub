@@ -214,11 +214,11 @@ class SessionManager:
         )
         self.running = False
         # hashX: List[int]
-        self.hashX_raw_history_cache = LFUCacheWithMetrics(2 ** 16, metric_name='raw_history', namespace=NAMESPACE)
+        self.hashX_raw_history_cache = LFUCacheWithMetrics(env.hashX_history_cache_size, metric_name='raw_history', namespace=NAMESPACE)
         # hashX: List[CachedAddressHistoryItem]
-        self.hashX_history_cache = LFUCacheWithMetrics(2 ** 14, metric_name='full_history', namespace=NAMESPACE)
+        self.hashX_history_cache = LFUCacheWithMetrics(env.hashX_history_cache_size, metric_name='full_history', namespace=NAMESPACE)
         # tx_num: Tuple[txid, height]
-        self.history_tx_info_cache = LFUCacheWithMetrics(2 ** 17, metric_name='history_tx', namespace=NAMESPACE)
+        self.history_tx_info_cache = LFUCacheWithMetrics(env.history_tx_cache_size, metric_name='history_tx', namespace=NAMESPACE)
 
     def clear_caches(self):
         self.resolve_cache.clear()

@@ -18,7 +18,7 @@ class BlockchainEnv(Env):
             if isinstance(rebuild_address_status_from_height, int) else -1
         self.daemon_ca_path = daemon_ca_path if daemon_ca_path else None
         self.history_tx_cache_size = history_tx_cache_size if history_tx_cache_size is not None else \
-            self.integer('HISTORY_TX_CACHE_SIZE', 262144)
+            self.integer('HISTORY_TX_CACHE_SIZE', 524288)
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
@@ -42,9 +42,9 @@ class BlockchainEnv(Env):
                             help="Rebuild address statuses, set to 0 to reindex all address statuses or provide a "
                                  "block height to start reindexing from. Defaults to -1 (off).")
         parser.add_argument('--history_tx_cache_size', type=int,
-                            default=cls.integer('HISTORY_TX_CACHE_SIZE', 262144),
+                            default=cls.integer('HISTORY_TX_CACHE_SIZE', 524288),
                             help="Size of the lfu cache of txids in transaction histories for addresses. "
-                                 "Can be set in the env with 'TX_CACHE_SIZE'")
+                                 "Can be set in the env with 'HISTORY_TX_CACHE_SIZE'")
 
     @classmethod
     def from_arg_parser(cls, args):

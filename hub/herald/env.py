@@ -12,7 +12,8 @@ class ServerEnv(Env):
                  database_query_timeout=None, elastic_notifier_host=None, elastic_notifier_port=None,
                  blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None,
                  index_address_status=None, address_history_cache_size=None, daemon_ca_path=None,
-                 merkle_cache_size=None, resolved_url_cache_size=None, tx_cache_size=None):
+                 merkle_cache_size=None, resolved_url_cache_size=None, tx_cache_size=None,
+                 history_tx_cache_size=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
                          cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
@@ -59,6 +60,8 @@ class ServerEnv(Env):
             'RESOLVED_URL_CACHE_SIZE', 32768)
         self.tx_cache_size = tx_cache_size if tx_cache_size is not None else self.integer(
             'TX_CACHE_SIZE', 32768)
+        self.history_tx_cache_size = history_tx_cache_size if history_tx_cache_size is not None else \
+            self.integer('HISTORY_TX_CACHE_SIZE', 524288)
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
@@ -123,6 +126,11 @@ class ServerEnv(Env):
                             default=cls.integer('TX_CACHE_SIZE', 32768),
                             help="Size of the lru cache of transactions. "
                                  "Can be set in the env with 'TX_CACHE_SIZE'")
+        parser.add_argument('--history_tx_cache_size', type=int,
+                            default=cls.integer('HISTORY_TX_CACHE_SIZE', 524288),
+                            help="Size of the lfu cache of txids in transaction histories for addresses. "
+                                 "Can be set in the env with 'HISTORY_TX_CACHE_SIZE'")
+
     @classmethod
     def from_arg_parser(cls, args):
         return cls(
@@ -140,5 +148,5 @@ class ServerEnv(Env):
             elastic_notifier_port=args.elastic_notifier_port, index_address_status=args.index_address_statuses,
             address_history_cache_size=args.address_history_cache_size, daemon_ca_path=args.daemon_ca_path,
             merkle_cache_size=args.merkle_cache_size, resolved_url_cache_size=args.resolved_url_cache_size,
-            tx_cache_size=args.tx_cache_size
+            tx_cache_size=args.tx_cache_size, history_tx_cache_size=args.history_tx_cache_size
         )
