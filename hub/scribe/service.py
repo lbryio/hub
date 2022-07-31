@@ -1745,6 +1745,7 @@ class BlockchainProcessorService(BlockchainService):
         await self.run_in_thread_with_lock(flush)
 
     def _iter_start_tasks(self):
+        self.block_count_metric.set(0 if not self.last_state else self.last_state.height)
         yield self.start_prometheus()
         while self.db.db_version < max(self.db.DB_VERSIONS):
             if self.db.db_version == 7:
