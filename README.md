@@ -5,6 +5,8 @@ This repo provides a python library, `hub`, for building services that use the p
  * `herald` ([hub.herald.service](https://github.com/lbryio/hub/tree/master/hub/herald/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryio/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain.
  * `scribe-elastic-sync` ([hub.elastic_sync.service](https://github.com/lbryio/hub/tree/master/hub/elastic_sync/service.py)) - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
 
+![](https://raw.githubusercontent.com/lbryio/hub/master/docs/diagram.png)
+
 Features and overview of `hub` as a python library:
  * Uses Python 3.7-3.9 (3.10 probably works but hasn't yet been tested)
  * An interface developers may implement in order to build their own applications able to receive up-to-date blockchain data in an ongoing manner ([hub.service.BlockchainReaderService](https://github.com/lbryio/hub/tree/master/hub/service.py))
