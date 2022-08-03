@@ -7,8 +7,11 @@ from hub.db.prefixes import ClaimToTXOPrefixRow, PrefixDB
 
 class TestRevertableOpStack(unittest.TestCase):
     def setUp(self):
-        self.fake_db = {}
-        self.stack = RevertableOpStack(self.fake_db.get)
+        class FakeDB(dict):
+            def multi_get(keys):
+                return map(self.get, keys)
+        self.fake_db = FakeDB()
+        self.stack = RevertableOpStack(self.fake_db.get, self.fake_db.multi_get)
 
     def tearDown(self) -> None:
         self.stack.clear()
@@ -167,7 +170,7 @@ class TestRevertablePrefixDB(unittest.TestCase):
         self.db.claim_expiration.stage_put((overflow_value, 1004, 0), (claim_hash3, name))
         self.db.tx_num.stage_put((b'\x00' * 32,), (101,))
         self.db.claim_takeover.stage_put((name,), (claim_hash3, 101))
-        self.db.db_state.stage_put((), (b'n?\xcf\x12\x99\xd4\xec]y\xc3\xa4\xc9\x1dbJJ\xcf\x9e.\x17=\x95\xa1\xa0POgvihuV', 0, 1, b'VuhivgOP\xa0\xa1\x95=\x17.\x9e\xcfJJb\x1d\xc9\xa4\xc3y]\xec\xd4\x99\x12\xcf?n', 1, 0, 1, 7, 1, -1, -1, 0))
+        self.db.db_state.stage_put((), (b'n?\xcf\x12\x99\xd4\xec]y\xc3\xa4\xc9\x1dbJJ\xcf\x9e.\x17=\x95\xa1\xa0POgvihuV', 0, 1, b'VuhivgOP\xa0\xa1\x95=\x17.\x9e\xcfJJb\x1d\xc9\xa4\xc3y]\xec\xd4\x99\x12\xcf?n', 1, 0, 1, 7, 1, -1, -1, 0, 0, 0))
         self.db.unsafe_commit()
 
         state = self.db.db_state.get()
