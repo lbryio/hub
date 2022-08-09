@@ -430,11 +430,11 @@ class DBState(typing.NamedTuple):
 
     @property
     def catching_up(self) -> bool:
-        return self.bit_fields & 1 == 1
+        return self.bit_fields & 1 != 0
 
     @property
     def index_address_statuses(self) -> bool:
-        return self.bit_fields & 2 == 1
+        return self.bit_fields & 2 != 0
 
     @property
     def expanded(self):
