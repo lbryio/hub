@@ -693,23 +693,43 @@ class SecondaryDB:
                     channel_tx_hash = claim_tx_hashes[channel_txo.tx_num]
                     channel_tx_position = channel_txo.position
                     channel_height = bisect_right(self.tx_counts, channel_txo.tx_num)
-
             if apply_blocking:
-                blocker_hash = self.blocked_streams.get(touched) or self.blocked_streams.get(
+                blocker = self.blocked_streams.get(touched) or self.blocked_streams.get(
                         reposted_claim_hash) or self.blocked_channels.get(touched) or self.blocked_channels.get(
                         reposted_channel_hash) or self.blocked_channels.get(channel_hash)
-                if blocker_hash:
-                    reason_row = self._fs_get_claim_by_hash(blocker_hash)
-
-                    return ResolveCensoredError(f'lbry://{canonical_url}', blocker_hash.hex(), censor_row=reason_row)
+                if blocker:
+                    blocker_channel_hash, blocker_repost_hash = blocker
+                    blocker_channel = self._fs_get_claim_by_hash(blocker_channel_hash)
+                    blocker_claim = self._fs_get_claim_by_hash(blocker_repost_hash)
+                    censored_url = f'lbry://{canonical_url}'
+                    censoring_url = f'lbry://{blocker_channel.name}#{blocker_channel_hash.hex()[:10]}/{blocker_claim.name}#{blocker_repost_hash.hex()[:10]}'
+                    reason = self.get_claim_metadata(blocker_claim.tx_hash, blocker_claim.position)
+                    if reason:
+                        reason = reason.repost.description
+                    else:
+                        reason = ''
+                    return ResolveCensoredError(
+                        censored_url, censoring_url, blocker_channel_hash.hex(), reason, blocker_channel
+                    )
 
             if apply_filtering:
-                filter_hash = self.filtered_streams.get(touched) or self.filtered_streams.get(
+                filter_info = self.filtered_streams.get(touched) or self.filtered_streams.get(
                         reposted_claim_hash) or self.filtered_channels.get(touched) or self.filtered_channels.get(
                         reposted_channel_hash) or self.filtered_channels.get(channel_hash)
-                if filter_hash:
-                    reason_row = self._fs_get_claim_by_hash(filter_hash)
-                    return ResolveCensoredError(f'lbry://{canonical_url}', filter_hash.hex(), censor_row=reason_row)
+                if filter_info:
+                    filter_channel_hash, filter_repost_hash = filter_info
+                    filter_channel = self._fs_get_claim_by_hash(filter_channel_hash)
+                    filter_claim = self._fs_get_claim_by_hash(filter_repost_hash)
+                    censored_url = f'lbry://{canonical_url}'
+                    censoring_url = f'lbry://{filter_channel.name}#{filter_channel_hash.hex()[:10]}/{filter_claim.name}#{filter_repost_hash.hex()[:10]}'
+                    reason = self.get_claim_metadata(filter_claim.tx_hash, filter_claim.position)
+                    if reason:
+                        reason = reason.repost.description
+                    else:
+                        reason = ''
+                    return ResolveCensoredError(
+                        censored_url, censoring_url, filter_channel_hash.hex(), reason, filter_channel
+                    )
 
             return ResolveResult(
                 claim_txo.name, normalized_name, touched, claim_txo.tx_num, claim_txo.position, tx_hash, height,
@@ -793,9 +813,9 @@ class SecondaryDB:
                     txo = self.get_claim_txo(repost)
                     if txo:
                         if txo.normalized_name.startswith('@'):
-                            channels[repost] = reposter_channel_hash
+                            channels[repost] = reposter_channel_hash, stream.claim_hash
                         else:
-                            streams[repost] = reposter_channel_hash
+                            streams[repost] = reposter_channel_hash, stream.claim_hash
         return streams, channels
 
     def get_channel_for_claim(self, claim_hash, tx_num, position) -> Optional[bytes]:

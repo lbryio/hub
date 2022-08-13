@@ -154,27 +154,28 @@ class ElasticSyncService(BlockchainReaderService):
         return update
 
     async def apply_filters(self, blocked_streams, blocked_channels, filtered_streams, filtered_channels):
+        only_channels = lambda x: {k: chan for k, (chan, repost) in x.items()}
         if filtered_streams:
             await self.sync_client.update_by_query(
-                self.index, body=self.update_filter_query(Censor.SEARCH, filtered_streams), slices=4)
+                self.index, body=self.update_filter_query(Censor.SEARCH, only_channels(filtered_streams)), slices=4)
             await self.sync_client.indices.refresh(self.index)
         if filtered_channels:
             await self.sync_client.update_by_query(
-                self.index, body=self.update_filter_query(Censor.SEARCH, filtered_channels), slices=4)
+                self.index, body=self.update_filter_query(Censor.SEARCH, only_channels(filtered_channels)), slices=4)
             await self.sync_client.indices.refresh(self.index)
             await self.sync_client.update_by_query(
-                self.index, body=self.update_filter_query(Censor.SEARCH, filtered_channels, True), slices=4)
+                self.index, body=self.update_filter_query(Censor.SEARCH, only_channels(filtered_channels), True), slices=4)
             await self.sync_client.indices.refresh(self.index)
         if blocked_streams:
             await self.sync_client.update_by_query(
-                self.index, body=self.update_filter_query(Censor.RESOLVE, blocked_streams), slices=4)
+                self.index, body=self.update_filter_query(Censor.RESOLVE, only_channels(blocked_streams)), slices=4)
             await self.sync_client.indices.refresh(self.index)
         if blocked_channels:
             await self.sync_client.update_by_query(
-                self.index, body=self.update_filter_query(Censor.RESOLVE, blocked_channels), slices=4)
+                self.index, body=self.update_filter_query(Censor.RESOLVE, only_channels(blocked_channels)), slices=4)
             await self.sync_client.indices.refresh(self.index)
             await self.sync_client.update_by_query(
-                self.index, body=self.update_filter_query(Censor.RESOLVE, blocked_channels, True), slices=4)
+                self.index, body=self.update_filter_query(Censor.RESOLVE, only_channels(blocked_channels), True), slices=4)
             await self.sync_client.indices.refresh(self.index)
 
     @staticmethod

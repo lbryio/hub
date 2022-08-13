@@ -112,12 +112,18 @@ class ElasticSyncDB(SecondaryDB):
             claim_languages = [lang.language or 'none' for lang in meta.languages] or ['none']
             tags = list(set(claim_tags).union(set(reposted_tags)))
             languages = list(set(claim_languages).union(set(reposted_languages)))
+            blocking_channel = None
             blocked_hash = self.blocked_streams.get(claim_hash) or self.blocked_streams.get(
                 reposted_claim_hash) or self.blocked_channels.get(claim_hash) or self.blocked_channels.get(
                 reposted_claim_hash) or self.blocked_channels.get(claim.channel_hash)
+            if blocked_hash:
+                blocking_channel, blocked_hash = blocked_hash
+            filtered_channel = None
             filtered_hash = self.filtered_streams.get(claim_hash) or self.filtered_streams.get(
                 reposted_claim_hash) or self.filtered_channels.get(claim_hash) or self.filtered_channels.get(
                 reposted_claim_hash) or self.filtered_channels.get(claim.channel_hash)
+            if filtered_hash:
+                filtered_channel, filtered_hash = filtered_hash
             value = {
                 'claim_id': claim_hash.hex(),
                 'claim_name': claim.name,
@@ -166,7 +172,8 @@ class ElasticSyncDB(SecondaryDB):
                 'tags': tags,
                 'languages': languages,
                 'censor_type': Censor.RESOLVE if blocked_hash else Censor.SEARCH if filtered_hash else Censor.NOT_CENSORED,
-                'censoring_channel_id': (blocked_hash or filtered_hash or b'').hex() or None,
+                'censoring_channel_id': (blocking_channel or filtered_channel or b'').hex() or None,
+                'censoring_claim_id': (blocked_hash or filtered_hash or b'').hex() or None,
                 'claims_in_channel': None if not metadata.is_channel else self.get_claims_in_channel_count(claim_hash),
                 'reposted_tx_id': None if not claim.reposted_tx_hash else claim.reposted_tx_hash[::-1].hex(),
                 'reposted_tx_position': claim.reposted_tx_position,
