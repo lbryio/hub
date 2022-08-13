@@ -1,4 +1,7 @@
+import typing
 from .base import BaseError, claim_id
+if typing.TYPE_CHECKING:
+    from hub.db.common import ResolveResult
 
 
 class UserInputError(BaseError):
@@ -262,11 +265,12 @@ class ResolveTimeoutError(WalletError):
 
 class ResolveCensoredError(WalletError):
 
-    def __init__(self, url, censor_id, censor_row):
-        self.url = url
+    def __init__(self, censored_url: str, censoring_url: str, censor_id: str, reason: str, censor_row: 'ResolveResult'):
+
+        self.url = censored_url
         self.censor_id = censor_id
         self.censor_row = censor_row
-        super().__init__(f"Resolve of '{url}' was censored by channel with claim id '{censor_id}'.")
+        super().__init__(f"Resolve of '{censored_url}' was censored by {censoring_url}'. Reason given: {reason}")
 
 
 class KeyFeeAboveMaxAllowedError(WalletError):
