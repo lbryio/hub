@@ -650,7 +650,7 @@ class SecondaryDB:
         censoring_channels = {}
         censoring_reposts = {}
 
-        def _get_censored_error(canonical_url: str, channel_hash: bytes, repost_hash: bytes):
+        def _get_censored_error(censor_type: str, canonical_url: str, channel_hash: bytes, repost_hash: bytes):
             channel = censoring_channels.get(channel_hash) or self._fs_get_claim_by_hash(channel_hash)
             censoring_channels[channel_hash] = channel
             claim = censoring_reposts.get(repost_hash) or self._fs_get_claim_by_hash(repost_hash)
@@ -666,7 +666,7 @@ class SecondaryDB:
                     reason = ''
                 censoring_reasons[(claim.tx_hash, claim.position)] = reason
             return ResolveCensoredError(
-                f'lbry://{canonical_url}', censoring_url, channel_hash.hex(), reason, channel
+                censor_type, f'lbry://{canonical_url}', censoring_url, channel_hash.hex(), reason, channel
             )
 
         def _prepare_result(touched, claim_txo):
@@ -723,7 +723,7 @@ class SecondaryDB:
                 if blocker:
                     blocker_channel_hash, blocker_repost_hash = blocker
                     return _get_censored_error(
-                        canonical_url, blocker_channel_hash, blocker_repost_hash
+                        'blocked', canonical_url, blocker_channel_hash, blocker_repost_hash
                     )
 
             if apply_filtering:
@@ -733,7 +733,7 @@ class SecondaryDB:
                 if filter_info:
                     filter_channel_hash, filter_repost_hash = filter_info
                     return _get_censored_error(
-                        canonical_url, filter_channel_hash, filter_repost_hash
+                        'filtered', canonical_url, filter_channel_hash, filter_repost_hash
                     )
 
             return ResolveResult(
