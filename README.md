@@ -2,7 +2,7 @@
 
 This repo provides a python library, `hub`, for building services that use the processed data from the [LBRY blockchain](https://github.com/lbryio/lbrycrd) in an ongoing manner. Hub contains a set of three core executable services that are used together:
  * `scribe` ([hub.scribe.service](https://github.com/lbryio/hub/tree/master/hub/service.py)) - maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the LBRY blockchain.
- * `herald` ([hub.herald.service](https://github.com/lbryio/hub/tree/master/hub/herald/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryio/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain.
+ * `herald` ([hub.herald.service](https://github.com/lbryio/hub/tree/master/hub/herald/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryio/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain. A drop in replacement port of herald written in go - [herald.go](https://github.com/lbryio/herald.go) is currently being worked on.
  * `scribe-elastic-sync` ([hub.elastic_sync.service](https://github.com/lbryio/hub/tree/master/hub/elastic_sync/service.py)) - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
 
 ![](https://raw.githubusercontent.com/lbryio/hub/master/docs/diagram.png)
