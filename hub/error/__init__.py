@@ -265,12 +265,13 @@ class ResolveTimeoutError(WalletError):
 
 class ResolveCensoredError(WalletError):
 
-    def __init__(self, censored_url: str, censoring_url: str, censor_id: str, reason: str, censor_row: 'ResolveResult'):
+    def __init__(self, censor_type: str, censored_url: str, censoring_url: str, censor_id: str, reason: str,
+                 censor_row: 'ResolveResult'):
 
         self.url = censored_url
         self.censor_id = censor_id
         self.censor_row = censor_row
-        super().__init__(f"Resolve of '{censored_url}' was censored by {censoring_url}'. Reason given: {reason}")
+        super().__init__(f"Resolve of '{censored_url}' was {censor_type} by {censoring_url}'. Reason given: {reason}")
 
 
 class KeyFeeAboveMaxAllowedError(WalletError):
