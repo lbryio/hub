@@ -4,6 +4,7 @@ import typing
 from typing import List
 from hashlib import sha256
 from decimal import Decimal
+from yarl import URL
 from hub.schema.base58 import Base58
 from hub.schema.bip32 import PublicKey
 from hub.common import hash160, hash_to_hex_str, double_sha256
@@ -72,6 +73,9 @@ class LBCMainNet:
             url += f':{cls.RPC_PORT:d}'
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'http://' + url
+        obj = URL(url)
+        if not obj.user or not obj.password:
+            raise CoinError(f'unparseable <user>:<pass> in daemon URL: "{url}"')
         return url + '/'
 
     @classmethod
