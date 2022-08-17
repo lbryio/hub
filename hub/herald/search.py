@@ -59,7 +59,7 @@ class SearchIndex:
             return False
         hosts = [{'host': self._elastic_host, 'port': self._elastic_port}]
         self.sync_client = AsyncElasticsearch(hosts, timeout=self.sync_timeout)
-        self.search_client = AsyncElasticsearch(hosts, timeout=self.search_timeout)
+        self.search_client = AsyncElasticsearch(hosts, timeout=self.search_timeout+1)
         while True:
             try:
                 await self.sync_client.cluster.health(wait_for_status='yellow')
@@ -207,6 +207,7 @@ class SearchIndex:
                     query = expand_query(**kwargs)
                     search_hits = deque((await self.search_client.search(
                         query, index=self.index, track_total_hits=False,
+                        timeout=f'{int(1000*self.search_timeout)}ms',
                         _source_includes=['_id', 'channel_id', 'reposted_claim_id', 'creation_height']
                     ))['hits']['hits'])
                     if remove_duplicates:
