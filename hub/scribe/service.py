@@ -786,7 +786,6 @@ class BlockchainProcessorService(BlockchainService):
         activated_at_height = self.db.get_activated_at_height(height)
         activate_in_future = defaultdict(lambda: defaultdict(list))
         future_activations = defaultdict(dict)
-        total_activated = set()
 
         def get_delayed_activate_ops(name: str, claim_hash: bytes, is_new_claim: bool, tx_num: int, nout: int,
                                      amount: int, is_support: bool):
@@ -930,7 +929,6 @@ class BlockchainProcessorService(BlockchainService):
                         # print("\tskip activate for non existent claim")
                         continue
                     self.activated_claim_amount_by_name_and_hash[(activated.normalized_name, activated.claim_hash)] = amount
-                    total_activated.add(activated.claim_hash)
                 else:
                     txo_type = ACTIVATED_SUPPORT_TXO_TYPE
                     txo_tup = (activated_txo.tx_num, activated_txo.position)
