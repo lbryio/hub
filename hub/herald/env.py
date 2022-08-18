@@ -61,7 +61,7 @@ class ServerEnv(Env):
         self.tx_cache_size = tx_cache_size if tx_cache_size is not None else self.integer(
             'TX_CACHE_SIZE', 32768)
         self.history_tx_cache_size = history_tx_cache_size if history_tx_cache_size is not None else \
-            self.integer('HISTORY_TX_CACHE_SIZE', 524288)
+            self.integer('HISTORY_TX_CACHE_SIZE', 4194304)
 
     @classmethod
     def contribute_to_arg_parser(cls, parser):
