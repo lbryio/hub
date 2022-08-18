@@ -62,7 +62,6 @@ class HubServerService(BlockchainReaderService):
 
     def unwind(self):
         self.session_manager.hashX_raw_history_cache.clear()
-        self.session_manager.hashX_history_cache.clear()
         prev_count = self.db.tx_counts.pop()
         tx_count = self.db.tx_counts[-1]
         self.db.block_hashes.pop()
