@@ -1261,11 +1261,7 @@ class LBRYElectrumX(asyncio.Protocol):
                 if not channel_claim or isinstance(channel_claim, (ResolveCensoredError, LookupError, ValueError)):
                     return Outputs.to_base64([], [])
                 kwargs['channel_id'] = channel_claim.claim_hash.hex()
-            
-            result, timed_out = await self.session_manager.search_index.cached_search(kwargs)
-            if timed_out:
-               self.session_manager.interrupt_count_metric.inc()
-            return result
+            return await self.session_manager.search_index.cached_search(kwargs)
         except ConnectionTimeout:
             self.session_manager.interrupt_count_metric.inc()
             raise RPCError(JSONRPC.QUERY_TIMEOUT, 'query timed out')
