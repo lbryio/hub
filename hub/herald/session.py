@@ -210,7 +210,8 @@ class SessionManager:
         # Search index
         self.search_index = SearchIndex(
             self.db, self.env.es_index_prefix, self.env.database_query_timeout,
-            elastic_host=env.elastic_host, elastic_port=env.elastic_port
+            elastic_host=env.elastic_host, elastic_port=env.elastic_port,
+            timeout_counter=self.interrupt_count_metric
         )
         self.running = False
         # hashX: List[int]
