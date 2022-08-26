@@ -58,7 +58,7 @@ class HashXHistoryKey(NamedTuple):
 
 
 class HashXHistoryValue(NamedTuple):
-    hashXes: typing.List[int]
+    tx_nums: typing.List[int]
 
 
 class BlockHashKey(NamedTuple):
