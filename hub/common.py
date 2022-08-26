@@ -7,8 +7,10 @@ import logging
 import logging.handlers
 import typing
 import collections
+from bisect import insort_right
+from collections import deque
 from decimal import Decimal
-from typing import Iterable
+from typing import Iterable, Deque
 from asyncio import get_event_loop, Event
 from prometheus_client import Counter
 from hub.schema.tags import clean_tags
@@ -482,6 +484,89 @@ class LFUCacheWithMetrics(LFUCache):
             return item.value
         if self._track_metrics:
             self.misses.inc()
+
+
+class LargestValueCacheItem:
+    __slots__ = [
+        'key',
+        'value',
+    ]
+
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+
+    def __gt__(self, other):
+        return len(self.value) > len(other.value)
+
+    def __ge__(self, other):
+        return len(self.value) >= len(other.value)
+
+    def __lt__(self, other):
+        return len(self.value) < len(other.value)
+
+    def __le__(self, other):
+        return len(self.value) <= len(other.value)
+
+    def __eq__(self, other):
+        return len(self.value) == len(other.value)
+
+
+class LargestValueCache:
+    __slots__ = [
+        '_capacity',
+        '_cache',
+        '_raw_cache'
+    ]
+
+    def __init__(self, capacity: int):
+        self._capacity = max(capacity, 0)
+        self._cache = {}
+        self._raw_cache: Deque[LargestValueCacheItem] = deque()
+
+    def items(self):
+        return self._cache.items()
+
+    def get(self, key, default=None):
+        return self._cache.get(key, default)
+
+    @property
+    def full(self):
+        return len(self._cache) >= self._capacity
+
+    def set(self, key, value) -> bool:
+        if self._capacity == 0:
+            return False
+        if self.full:
+            if len(value) < len(self._raw_cache[0].value):
+                return False
+            popped = self._raw_cache.popleft()
+            self._cache.pop(popped.key)
+        item = LargestValueCacheItem(key, value)
+        insort_right(self._raw_cache, item)
+        self._cache[key] = value
+        return True
+
+    def clear(self):
+        self._cache.clear()
+        self._raw_cache.clear()
+
+    def pop(self, key):
+        value = self._cache.pop(key)
+        self._raw_cache.remove(LargestValueCacheItem(key, value))
+        return value
+
+    def __setitem__(self, key, value):
+        return self.set(key, value)
+
+    def __getitem__(self, item):
+        return self.get(item)
+
+    def __contains__(self, item) -> bool:
+        return item in self._cache
+
+    def __len__(self):
+        return len(self._cache)
 
 
 # the ipaddress module does not show these subnets as reserved
