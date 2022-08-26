@@ -13,7 +13,7 @@ class ServerEnv(Env):
                  blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None,
                  index_address_status=None, address_history_cache_size=None, daemon_ca_path=None,
                  merkle_cache_size=None, resolved_url_cache_size=None, tx_cache_size=None,
-                 history_tx_cache_size=None):
+                 history_tx_cache_size=None, largest_address_history_cache_size=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
                          cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
@@ -54,6 +54,9 @@ class ServerEnv(Env):
             (float(self.integer('QUERY_TIMEOUT_MS', 10000)) / 1000.0)
         self.hashX_history_cache_size = address_history_cache_size if address_history_cache_size is not None \
             else self.integer('ADDRESS_HISTORY_CACHE_SIZE', 4096)
+        self.largest_hashX_history_cache_size = largest_address_history_cache_size if largest_address_history_cache_size is not None \
+            else self.integer('LARGEST_ADDRESS_HISTORY_CACHE_SIZE', 256)
+
         self.daemon_ca_path = daemon_ca_path if daemon_ca_path else None
         self.merkle_cache_size = merkle_cache_size if merkle_cache_size is not None else self.integer('MERKLE_CACHE_SIZE', 32768)
         self.resolved_url_cache_size = resolved_url_cache_size if resolved_url_cache_size is not None else self.integer(
@@ -110,6 +113,10 @@ class ServerEnv(Env):
         parser.add_argument('--daily_fee', default=cls.default('DAILY_FEE', '0'), type=str)
         parser.add_argument('--query_timeout_ms', type=int, default=cls.integer('QUERY_TIMEOUT_MS', 10000),
                             help="Elasticsearch query timeout, in ms. Can be set in env with 'QUERY_TIMEOUT_MS'")
+        parser.add_argument('--largest_address_history_cache_size', type=int,
+                            default=cls.integer('LARGEST_ADDRESS_HISTORY_CACHE_SIZE', 256),
+                            help="Size of the largest value cache for address histories. "
+                                 "Can be set in the env with 'LARGEST_ADDRESS_HISTORY_CACHE_SIZE'")
         parser.add_argument('--address_history_cache_size', type=int,
                             default=cls.integer('ADDRESS_HISTORY_CACHE_SIZE', 4096),
                             help="Size of the lru cache of address histories. "
@@ -148,5 +155,6 @@ class ServerEnv(Env):
             elastic_notifier_port=args.elastic_notifier_port, index_address_status=args.index_address_statuses,
             address_history_cache_size=args.address_history_cache_size, daemon_ca_path=args.daemon_ca_path,
             merkle_cache_size=args.merkle_cache_size, resolved_url_cache_size=args.resolved_url_cache_size,
-            tx_cache_size=args.tx_cache_size, history_tx_cache_size=args.history_tx_cache_size
+            tx_cache_size=args.tx_cache_size, history_tx_cache_size=args.history_tx_cache_size,
+            largest_address_history_cache_size=args.largest_address_history_cache_size
         )
