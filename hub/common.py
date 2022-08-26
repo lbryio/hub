@@ -522,7 +522,7 @@ class LargestValueCache:
     def __init__(self, capacity: int):
         self._capacity = max(capacity, 0)
         self._cache = {}
-        self._raw_cache: Deque[LargestValueCacheItem] = deque()
+        self._raw_cache: Deque[LargestValueCacheItem] = deque(maxlen=capacity)
 
     def items(self):
         return self._cache.items()
