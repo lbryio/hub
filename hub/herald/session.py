@@ -216,7 +216,7 @@ class SessionManager:
         # hashX: List[int]
         self.hashX_raw_history_cache = LFUCacheWithMetrics(env.hashX_history_cache_size, metric_name='raw_history', namespace=NAMESPACE)
         # hashX: List[CachedAddressHistoryItem]
-        self.hashX_history_cache = LargestValueCache(env.hashX_history_cache_size)
+        self.hashX_history_cache = LargestValueCache(env.largest_hashX_history_cache_size)
         # tx_num: Tuple[txid, height]
         self.history_tx_info_cache = LFUCacheWithMetrics(env.history_tx_cache_size, metric_name='history_tx', namespace=NAMESPACE)
 
