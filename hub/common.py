@@ -542,9 +542,9 @@ class LargestValueCache:
                 return False
             popped = self._raw_cache.popleft()
             self._cache.pop(popped.key)
+        self._cache[key] = value
         item = LargestValueCacheItem(key, value)
         insort_right(self._raw_cache, item)
-        self._cache[key] = value
         return True
 
     def clear(self):
