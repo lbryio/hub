@@ -1708,8 +1708,12 @@ class BlockchainProcessorService(BlockchainService):
                         raise err
         except asyncio.CancelledError:
             raise
+        except MemoryError:
+            self.log.error("out of memory, shutting down")
+            self.shutdown_event.set()
         except Exception as err:
-            self.log.exception("error in block processor loop: %s", err)
+            self.log.exception("fatal error in block processor loop: %s", err)
+            self.shutdown_event.set()
             raise err
         finally:
             self._ready_to_stop.set()
