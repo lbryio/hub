@@ -292,6 +292,9 @@ class BasePrefixDB:
     def multi_delete(self, items: typing.List[typing.Tuple[bytes, bytes]]):
         self._op_stack.multi_delete([RevertableDelete(k, v) for k, v in items])
 
+    def multi_put(self, items: typing.List[typing.Tuple[bytes, bytes]]):
+        self._op_stack.multi_put([RevertablePut(k, v) for k, v in items])
+
     def iterator(self, start: bytes, column_family: 'rocksdb.ColumnFamilyHandle' = None,
                  iterate_lower_bound: bytes = None, iterate_upper_bound: bytes = None,
                  reverse: bool = False, include_key: bool = True, include_value: bool = True,
