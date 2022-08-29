@@ -1369,13 +1369,14 @@ class SecondaryDB:
         return state
 
     def assert_db_state(self):
-        state = self.prefix_db.db_state.get()
-        assert self.db_version == state.db_version, f"{self.db_version} != {state.db_version}"
-        assert self.db_height == state.height, f"{self.db_height} != {state.height}"
-        assert self.db_tx_count == state.tx_count, f"{self.db_tx_count} != {state.tx_count}"
-        assert self.db_tip == state.tip, f"{self.db_tip} != {state.tip}"
-        assert self.catching_up == state.catching_up, f"{self.catching_up} != {state.catching_up}"
-        assert self.es_sync_height == state.es_sync_height, f"{self.es_sync_height} != {state.es_sync_height}"
+        if __debug__:
+            state = self.prefix_db.db_state.get()
+            assert self.db_version == state.db_version, f"{self.db_version} != {state.db_version}"
+            assert self.db_height == state.height, f"{self.db_height} != {state.height}"
+            assert self.db_tx_count == state.tx_count, f"{self.db_tx_count} != {state.tx_count}"
+            assert self.db_tip == state.tip, f"{self.db_tip} != {state.tip}"
+            assert self.catching_up == state.catching_up, f"{self.catching_up} != {state.catching_up}"
+            assert self.es_sync_height == state.es_sync_height, f"{self.es_sync_height} != {state.es_sync_height}"
 
     async def all_utxos(self, hashX):
         """Return all UTXOs for an address sorted in no particular order."""

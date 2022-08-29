@@ -118,7 +118,7 @@ class PrefixRow(metaclass=PrefixRowType):
             if idx % step == 0:
                 await asyncio.sleep(0)
 
-    def stage_multi_put(self, items):
+    def stage_multi_put(self, items: typing.List[typing.Tuple[typing.Tuple,typing.Tuple]]):
         self._op_stack.multi_put([RevertablePut(self.pack_key(*k), self.pack_value(*v)) for k, v in items])
 
     def get_pending(self, *key_args, fill_cache=True, deserialize_value=True):
@@ -138,6 +138,9 @@ class PrefixRow(metaclass=PrefixRowType):
 
     def stage_delete(self, key_args=(), value_args=()):
         self._op_stack.append_op(RevertableDelete(self.pack_key(*key_args), self.pack_value(*value_args)))
+
+    def stage_multi_delete(self, items: typing.List[typing.Tuple[typing.Tuple,typing.Tuple]]):
+        self._op_stack.multi_delete([RevertableDelete(self.pack_key(*k), self.pack_value(*v)) for k, v in items])
 
     @classmethod
     def pack_partial_key(cls, *args) -> bytes:
@@ -280,6 +283,8 @@ class BasePrefixDB:
         return self._db.get((cf, key), fill_cache=fill_cache)
 
     def multi_get(self, keys: typing.List[bytes], fill_cache=True):
+        if len(keys) == 0:
+            return []
         first_key = keys[0]
         if not all(first_key[0] == key[0] for key in keys):
             raise ValueError('cannot multi-delete across column families')
