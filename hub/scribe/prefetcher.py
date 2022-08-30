@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import typing
+from hub.scribe.daemon import LBCDaemon, DaemonError
 if typing.TYPE_CHECKING:
     from hub.scribe.network import LBCMainNet
-    from hub.scribe.daemon import LBCDaemon
 
 
 def chunks(items, size):
@@ -42,8 +42,12 @@ class Prefetcher:
             while True:
                 # Sleep a while if there is nothing to prefetch
                 await self.refill_event.wait()
-                if not await self._prefetch_blocks():
-                    await asyncio.sleep(self.polling_delay)
+                try:
+                    if not await self._prefetch_blocks():
+                        await asyncio.sleep(self.polling_delay)
+                except DaemonError as err:
+                    self.logger.warning("block prefetcher failed: '%s', retrying in 5 seconds", err)
+                    await asyncio.sleep(5)
         except Exception as e:
             if not isinstance(e, asyncio.CancelledError):
                 self.logger.exception("block fetcher loop crashed")
