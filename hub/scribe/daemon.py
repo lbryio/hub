@@ -183,6 +183,8 @@ class LBCDaemon:
         start = time.perf_counter()
 
         def processor(result):
+            if result is None:
+                raise WarmingUpError
             err = result['error']
             if not err:
                 return result['result']
@@ -207,6 +209,8 @@ class LBCDaemon:
         start = time.perf_counter()
 
         def processor(result):
+            if result is None:
+                raise WarmingUpError
             errs = [item['error'] for item in result if item['error']]
             if any(err.get('code') == self.WARMING_UP for err in errs):
                 raise WarmingUpError
