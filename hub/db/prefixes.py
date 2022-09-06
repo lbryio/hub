@@ -1776,12 +1776,13 @@ class EffectiveAmountKey(NamedTuple):
 
 class EffectiveAmountValue(NamedTuple):
     effective_amount: int
+    support_sum: int
 
 
 class EffectiveAmountPrefixRow(PrefixRow):
     prefix = DB_PREFIXES.effective_amount.value
     key_struct = struct.Struct(b'>20s')
-    value_struct = struct.Struct(b'>Q')
+    value_struct = struct.Struct(b'>QQ')
 
     key_part_lambdas = [
         lambda: b'',
@@ -1797,16 +1798,16 @@ class EffectiveAmountPrefixRow(PrefixRow):
         return EffectiveAmountKey(*super().unpack_key(key))
 
     @classmethod
-    def pack_value(cls, effective_amount: int) -> bytes:
-        return super().pack_value(effective_amount)
+    def pack_value(cls, effective_amount: int, support_sum: int) -> bytes:
+        return super().pack_value(effective_amount, support_sum)
 
     @classmethod
     def unpack_value(cls, data: bytes) -> EffectiveAmountValue:
         return EffectiveAmountValue(*cls.value_struct.unpack(data))
 
     @classmethod
-    def pack_item(cls, claim_hash: bytes,  effective_amount: int):
-        return cls.pack_key(claim_hash), cls.pack_value(effective_amount)
+    def pack_item(cls, claim_hash: bytes,  effective_amount: int, support_sum: int):
+        return cls.pack_key(claim_hash), cls.pack_value(effective_amount, support_sum)
 
 
 class PrefixDB(BasePrefixDB):
