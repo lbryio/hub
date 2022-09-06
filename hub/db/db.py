@@ -494,6 +494,13 @@ class SecondaryDB:
         return self.prefix_db.claim_to_txo.get(claim_hash)
 
     def _get_active_amount(self, claim_hash: bytes, txo_type: int, height: int) -> int:
+        if height == self.db_height + 1:
+            v = self.prefix_db.effective_amount.get(claim_hash)
+            if not v:
+                return 0
+            if txo_type is ACTIVATED_SUPPORT_TXO_TYPE:
+                return v.support_sum
+            return v.effective_amount - v.support_sum
         return sum(
             v.amount for v in self.prefix_db.active_amount.iterate(
                 start=(claim_hash, txo_type, 0), stop=(claim_hash, txo_type, height), include_key=False
@@ -501,6 +508,11 @@ class SecondaryDB:
         )
 
     def get_active_amount_as_of_height(self, claim_hash: bytes, height: int) -> int:
+        if height == self.db_height + 1:
+            v = self.prefix_db.effective_amount.get(claim_hash)
+            if not v:
+                return 0
+            return v.effective_amount - v.support_sum
         for v in self.prefix_db.active_amount.iterate(
                 start=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, 0), stop=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, height),
                 include_key=False, reverse=True):
