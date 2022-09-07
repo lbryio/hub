@@ -1314,6 +1314,7 @@ class BlockchainProcessorService(BlockchainService):
             for claim_hash, v in current_effective_amount_values.items() if v is not None
         ]
         claims = set(self.effective_amount_delta.keys()).union(self.active_support_amount_delta.keys())
+        claims = claims.difference(self.abandoned_claims.keys())
         new_effective_amounts = {
             claim_hash: ((current_effective_amounts.get(claim_hash, 0) or 0) + self.effective_amount_delta.get(claim_hash, 0),
                          (current_supports_amount.get(claim_hash, 0) or 0) + self.active_support_amount_delta.get(claim_hash, 0))
