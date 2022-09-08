@@ -1252,7 +1252,7 @@ class BlockchainProcessorService(BlockchainService):
                     self.db.prefix_db.bid_order.stage_delete(
                         (removed_claim.normalized_name, amt.effective_amount, amt.tx_num, amt.position), (removed,)
                     )
-        # update or insert new bid orders
+        # update or insert new bid orders and prepare to update the effective amount index
         for touched in self.touched_claim_hashes:
             prev_effective_amount = 0
 
@@ -1292,6 +1292,7 @@ class BlockchainProcessorService(BlockchainService):
                     (height, touched), (prev_effective_amount, new_effective_amount)
                 )
 
+        # update the effective amount index
         current_effective_amount_values = {
             claim_hash: v for claim_hash, v in zip(
                 self.effective_amount_delta,
@@ -1308,13 +1309,19 @@ class BlockchainProcessorService(BlockchainService):
             claim_hash: 0 if not v else v.support_sum
             for claim_hash, v in current_effective_amount_values.items()
         }
-
         delete_effective_amounts = [
             self.db.prefix_db.effective_amount.pack_item(claim_hash, v.effective_amount, v.support_sum)
             for claim_hash, v in current_effective_amount_values.items() if v is not None
         ]
         claims = set(self.effective_amount_delta.keys()).union(self.active_support_amount_delta.keys())
         claims = claims.difference(self.abandoned_claims.keys())
+        # check that all of the claims exist, it's possible we got supports for claims that don't exist
+        missing = set()
+        for claim_hash, claim_txo in zip(
+                claims, self.db.prefix_db.claim_to_txo.multi_get([(claim_hash,) for claim_hash in claims])):
+            if not claim_txo and claim_hash not in self.claim_hash_to_txo:
+                missing.add(claim_hash)  # it's a support for a claim that doesn't exist
+        claims = claims.difference(missing)
         new_effective_amounts = {
             claim_hash: ((current_effective_amounts.get(claim_hash, 0) or 0) + self.effective_amount_delta.get(claim_hash, 0),
                          (current_supports_amount.get(claim_hash, 0) or 0) + self.active_support_amount_delta.get(claim_hash, 0))
