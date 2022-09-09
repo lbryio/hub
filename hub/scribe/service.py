@@ -419,11 +419,14 @@ class BlockchainProcessorService(BlockchainService):
         )
 
         # short url resolution
-        for prefix_len in range(10):
-            self.db.prefix_db.claim_short_id.stage_put(
-                (pending.normalized_name, pending.claim_hash.hex()[:prefix_len + 1],
-                 pending.root_tx_num, pending.root_position),
-                (pending.tx_num, pending.position)
+        self.db.prefix_db.claim_short_id.stage_multi_put(
+                [
+                    (
+                        (pending.normalized_name, pending.claim_hash.hex()[:prefix_len + 1],
+                             pending.root_tx_num, pending.root_position),
+                        (pending.tx_num, pending.position)
+                    ) for prefix_len in range(10)
+                ]
             )
 
         if pending.signing_hash and pending.channel_signature_is_valid:
