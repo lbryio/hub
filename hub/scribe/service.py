@@ -1305,15 +1305,15 @@ class BlockchainProcessorService(BlockchainService):
             )
         }
         current_effective_amounts = {
-            claim_hash: 0 if not v else v.effective_amount
+            claim_hash: 0 if not v else v.activated_sum
             for claim_hash, v in current_effective_amount_values.items()
         }
         current_supports_amount = {
-            claim_hash: 0 if not v else v.support_sum
+            claim_hash: 0 if not v else v.activated_support_sum
             for claim_hash, v in current_effective_amount_values.items()
         }
         delete_effective_amounts = [
-            self.db.prefix_db.effective_amount.pack_item(claim_hash, v.effective_amount, v.support_sum)
+            self.db.prefix_db.effective_amount.pack_item(claim_hash, v.activated_sum, v.activated_support_sum)
             for claim_hash, v in current_effective_amount_values.items() if v is not None
         ]
         claims = set(self.effective_amount_delta.keys()).union(self.active_support_amount_delta.keys())

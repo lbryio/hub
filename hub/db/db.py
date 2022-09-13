@@ -499,9 +499,9 @@ class SecondaryDB:
             if not v:
                 amount = 0
             elif txo_type is ACTIVATED_SUPPORT_TXO_TYPE:
-                amount = v.support_sum
+                amount = v.activated_support_sum
             else:
-                amount = v.effective_amount - v.support_sum
+                amount = v.activated_sum - v.activated_support_sum
             if height == self.db_height + 1:
                 return amount
             return amount + sum(
@@ -521,7 +521,7 @@ class SecondaryDB:
             v = self.prefix_db.effective_amount.get(claim_hash)
             if not v:
                 return 0
-            return v.effective_amount - v.support_sum
+            return v.activated_sum - v.activated_support_sum
         for v in self.prefix_db.active_amount.iterate(
                 start=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, 0), stop=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, height),
                 include_key=False, reverse=True):
@@ -531,7 +531,7 @@ class SecondaryDB:
     def get_effective_amount(self, claim_hash: bytes) -> int:
         v = self.prefix_db.effective_amount.get(claim_hash)
         if v:
-            return v.effective_amount
+            return v.activated_sum
         return 0
 
     def get_url_effective_amount(self, name: str, claim_hash: bytes) -> Optional['BidOrderKey']:
@@ -665,7 +665,7 @@ class SecondaryDB:
 
         # collect all of the effective amounts
         effective_amounts = {
-            claim_hash: 0 if not v else v.effective_amount
+            claim_hash: 0 if not v else v.activated_sum
             async for (claim_hash, ), v in self.prefix_db.effective_amount.multi_get_async_gen(
                 self._executor, [(claim_hash,) for claim_hash in claims]
             )
