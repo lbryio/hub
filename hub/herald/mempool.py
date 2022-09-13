@@ -237,12 +237,13 @@ class HubMemPool:
             session = self.session_manager.sessions.get(session_id)
             if session:
                 if session.subscribe_headers and height_changed:
-                    asyncio.create_task(
-                        session.send_notification('blockchain.headers.subscribe',
-                                                  (self.session_manager.hsub_results[session.subscribe_headers_raw],))
+                    session.send_notification(
+                        'blockchain.headers.subscribe',
+                        (self.session_manager.hsub_results[session.subscribe_headers_raw],)
                     )
+
                 if hashXes:
-                    asyncio.create_task(session.send_history_notifications(hashXes))
+                    session.send_history_notifications(hashXes)
 
     async def _notify_sessions(self, height, touched, new_touched):
         """Notify sessions about height changes and touched addresses."""
