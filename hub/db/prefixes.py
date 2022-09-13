@@ -1775,8 +1775,8 @@ class EffectiveAmountKey(NamedTuple):
 
 
 class EffectiveAmountValue(NamedTuple):
-    effective_amount: int
-    support_sum: int
+    activated_sum: int
+    activated_support_sum: int
 
 
 class EffectiveAmountPrefixRow(PrefixRow):
