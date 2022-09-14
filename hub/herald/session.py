@@ -1109,7 +1109,7 @@ class LBRYElectrumX(asyncio.Protocol):
     def send_notification(self, method, args=()):
         self._task_group.add(self._send_notification(method, args))
 
-    async def send_notifications(self, notifications) -> bool:
+    async def _send_notifications(self, notifications) -> bool:
         """Send an RPC notification over the network."""
         message, _ = self.connection.send_batch(notifications)
         try:
@@ -1215,7 +1215,7 @@ class LBRYElectrumX(asyncio.Protocol):
             self.NOTIFICATION_COUNT.labels(method='blockchain.address.subscribe', ).inc(address_notifications)
         self.session_manager.notifications_in_flight_metric.inc(len(notifications))
         try:
-            await self.send_notifications(Batch(notifications))
+            await self._send_notifications(Batch(notifications))
             self.session_manager.notifications_sent_metric.observe(time.perf_counter() - start)
         finally:
             self.session_manager.notifications_in_flight_metric.dec(len(notifications))
