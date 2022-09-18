@@ -3,7 +3,7 @@ import asyncio
 from bisect import bisect_right
 from collections import Counter, deque
 from operator import itemgetter
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING, Deque, Tuple
 
 from elasticsearch import AsyncElasticsearch, NotFoundError, ConnectionError
 from hub.schema.result import Censor, Outputs
@@ -29,8 +29,9 @@ class StreamResolution(str):
 class SearchIndex:
     VERSION = 1
 
-    def __init__(self, hub_db: 'SecondaryDB', index_prefix: str, search_timeout=3.0, elastic_host='localhost',
-                 elastic_port=9200, timeout_counter: Optional['PrometheusCounter'] = None):
+    def __init__(self, hub_db: 'SecondaryDB', index_prefix: str, search_timeout=3.0,
+                 elastic_services: Optional[Deque[Tuple[Tuple[str, int], Tuple[str, int]]]] = None,
+                 timeout_counter: Optional['PrometheusCounter'] = None):
         self.hub_db = hub_db
         self.search_timeout = search_timeout
         self.timeout_counter: Optional['PrometheusCounter'] = timeout_counter
@@ -41,8 +42,8 @@ class SearchIndex:
         self.logger = logging.getLogger(__name__)
         self.claim_cache = LRUCache(2 ** 15)
         self.search_cache = LRUCache(2 ** 17)
-        self._elastic_host = elastic_host
-        self._elastic_port = elastic_port
+        self._elastic_services = elastic_services
+        self.lost_connection = asyncio.Event()
 
     async def get_index_version(self) -> int:
         try:
@@ -59,7 +60,7 @@ class SearchIndex:
     async def start(self) -> bool:
         if self.sync_client:
             return False
-        hosts = [{'host': self._elastic_host, 'port': self._elastic_port}]
+        hosts = [{'host': self._elastic_services[0][0][0], 'port': self._elastic_services[0][0][1]}]
         self.sync_client = AsyncElasticsearch(hosts, timeout=self.sync_timeout)
         self.search_client = AsyncElasticsearch(hosts, timeout=self.search_timeout+1)
         while True:

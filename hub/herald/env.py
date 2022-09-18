@@ -1,29 +1,38 @@
 import re
+from collections import deque
 from hub.env import Env
+
+ELASTIC_SERVICES_REGEX = re.compile("(([\d|\.]|[^,:\/])*:\d*\/([\d|\.]|[^,:\/])*:\d*,?)*")
+
+
+def parse_es_services(elastic_services_arg: str):
+    match = ELASTIC_SERVICES_REGEX.match(elastic_services_arg)
+    if not match:
+        return []
+    matching = match.group()
+    services = [item.split('/') for item in matching.split(',') if item]
+    return [
+        ((es.split(':')[0], int(es.split(':')[1])), (notifier.split(':')[0], int(notifier.split(':')[1])))
+        for (es, notifier) in services
+    ]
 
 
 class ServerEnv(Env):
     def __init__(self, db_dir=None, max_query_workers=None, chain=None, reorg_limit=None,
                  prometheus_port=None, cache_all_tx_hashes=None, cache_all_claim_txos=None,
-                 daemon_url=None, host=None, elastic_host=None, elastic_port=None, es_index_prefix=None,
+                 daemon_url=None, host=None, elastic_services=None, es_index_prefix=None,
                  tcp_port=None, udp_port=None, banner_file=None, allow_lan_udp=None, country=None,
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
                  session_timeout=None, drop_client=None, description=None, daily_fee=None,
-                 database_query_timeout=None, elastic_notifier_host=None, elastic_notifier_port=None,
-                 blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None,
-                 index_address_status=None, address_history_cache_size=None, daemon_ca_path=None,
+                 database_query_timeout=None, blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None,
+                 peer_announce=None, index_address_status=None, address_history_cache_size=None, daemon_ca_path=None,
                  merkle_cache_size=None, resolved_url_cache_size=None, tx_cache_size=None,
                  history_tx_cache_size=None, largest_address_history_cache_size=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
                          cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
         self.host = host if host is not None else self.default('HOST', 'localhost')
-        self.elastic_host = elastic_host if elastic_host is not None else self.default('ELASTIC_HOST', 'localhost')
-        self.elastic_port = elastic_port if elastic_port is not None else self.integer('ELASTIC_PORT', 9200)
-        self.elastic_notifier_host = elastic_notifier_host if elastic_notifier_host is not None else self.default(
-            'ELASTIC_NOTIFIER_HOST', 'localhost')
-        self.elastic_notifier_port = elastic_notifier_port if elastic_notifier_port is not None else self.integer(
-            'ELASTIC_NOTIFIER_PORT', 19080)
+        self.elastic_services = deque(parse_es_services(elastic_services or 'localhost:9200/localhost:19080'))
         self.es_index_prefix = es_index_prefix if es_index_prefix is not None else self.default('ES_INDEX_PREFIX', '')
         # Server stuff
         self.tcp_port = tcp_port if tcp_port is not None else self.integer('TCP_PORT', None)
@@ -93,15 +102,13 @@ class ServerEnv(Env):
                             help="Regex used for blocking clients")
         parser.add_argument('--session_timeout', type=int, default=cls.integer('SESSION_TIMEOUT', 600),
                             help="Session inactivity timeout")
-        parser.add_argument('--elastic_host', default=cls.default('ELASTIC_HOST', 'localhost'), type=str,
-                            help="Hostname or ip address of the elasticsearch instance to connect to. "
-                                 "Can be set in env with 'ELASTIC_HOST'")
-        parser.add_argument('--elastic_port', default=cls.integer('ELASTIC_PORT', 9200), type=int,
-                            help="Elasticsearch port to connect to. Can be set in env with 'ELASTIC_PORT'")
-        parser.add_argument('--elastic_notifier_host', default=cls.default('ELASTIC_NOTIFIER_HOST', 'localhost'),
-                            type=str, help='elasticsearch sync notifier host, defaults to localhost')
-        parser.add_argument('--elastic_notifier_port', default=cls.integer('ELASTIC_NOTIFIER_PORT', 19080), type=int,
-                            help='elasticsearch sync notifier port')
+        parser.add_argument('--elastic_services',
+                            default=cls.default('ELASTIC_SERVICES', 'localhost:9200/localhost:19080'), type=str,
+                            help="Hosts and ports for elastic search and the scribe elastic sync notifier. "
+                                 "Given as a comma separated list without spaces of items in the format "
+                                 "<elastic host>:<elastic port>/<notifier host>:<notifier port> . "
+                                 "Defaults to 'localhost:9200/localhost:19080'. "
+                                 "Can be set in env with 'ELASTIC_SERVICES'")
         parser.add_argument('--es_index_prefix', default=cls.default('ES_INDEX_PREFIX', ''), type=str)
         parser.add_argument('--allow_lan_udp', action='store_true',
                             help="Reply to clients on the local network", default=cls.boolean('ALLOW_LAN_UDP', False))
@@ -141,8 +148,8 @@ class ServerEnv(Env):
     @classmethod
     def from_arg_parser(cls, args):
         return cls(
-            db_dir=args.db_dir, daemon_url=args.daemon_url, host=args.host, elastic_host=args.elastic_host,
-            elastic_port=args.elastic_port, max_query_workers=args.max_query_workers, chain=args.chain,
+            db_dir=args.db_dir, daemon_url=args.daemon_url, host=args.host, elastic_services=args.elastic_services,
+            max_query_workers=args.max_query_workers, chain=args.chain,
             es_index_prefix=args.es_index_prefix, reorg_limit=args.reorg_limit, tcp_port=args.tcp_port,
             udp_port=args.udp_port, prometheus_port=args.prometheus_port, banner_file=args.banner_file,
             allow_lan_udp=args.allow_lan_udp, cache_all_tx_hashes=args.cache_all_tx_hashes,
@@ -151,8 +158,7 @@ class ServerEnv(Env):
             max_sessions=args.max_sessions, session_timeout=args.session_timeout,
             drop_client=args.drop_client, description=args.description, daily_fee=args.daily_fee,
             database_query_timeout=args.query_timeout_ms, blocking_channel_ids=args.blocking_channel_ids,
-            filtering_channel_ids=args.filtering_channel_ids, elastic_notifier_host=args.elastic_notifier_host,
-            elastic_notifier_port=args.elastic_notifier_port, index_address_status=args.index_address_statuses,
+            filtering_channel_ids=args.filtering_channel_ids, index_address_status=args.index_address_statuses,
             address_history_cache_size=args.address_history_cache_size, daemon_ca_path=args.daemon_ca_path,
             merkle_cache_size=args.merkle_cache_size, resolved_url_cache_size=args.resolved_url_cache_size,
             tx_cache_size=args.tx_cache_size, history_tx_cache_size=args.history_tx_cache_size,
