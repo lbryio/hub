@@ -142,7 +142,6 @@ class SessionManager:
     tx_replied_count_metric = Counter("replied_transaction", "Number of transactions responded", namespace=NAMESPACE)
     urls_to_resolve_count_metric = Counter("urls_to_resolve", "Number of urls to resolve", namespace=NAMESPACE)
     resolved_url_count_metric = Counter("resolved_url", "Number of resolved urls", namespace=NAMESPACE)
-    interrupt_count_metric = Counter("interrupt", "Number of interrupted queries", namespace=NAMESPACE)
     db_operational_error_metric = Counter(
         "operational_error", "Number of queries that raised operational errors", namespace=NAMESPACE
     )
@@ -181,7 +180,7 @@ class SessionManager:
     )
 
     def __init__(self, env: 'ServerEnv', db: 'SecondaryDB', mempool: 'HubMemPool',
-                 daemon: 'LBCDaemon', shutdown_event: asyncio.Event,
+                 daemon: 'LBCDaemon', search_index: 'SearchIndex', shutdown_event: asyncio.Event,
                  on_available_callback: typing.Callable[[], None], on_unavailable_callback: typing.Callable[[], None]):
         env.max_send = max(350000, env.max_send)
         self.env = env
@@ -190,6 +189,7 @@ class SessionManager:
         self.on_unavailable_callback = on_unavailable_callback
         self.daemon = daemon
         self.mempool = mempool
+        self.search_index = search_index
         self.shutdown_event = shutdown_event
         self.logger = logging.getLogger(__name__)
         self.servers: typing.Dict[str, asyncio.AbstractServer] = {}
@@ -208,12 +208,6 @@ class SessionManager:
         self.protocol_class = LBRYElectrumX
         self.session_event = Event()
 
-        # Search index
-        self.search_index = SearchIndex(
-            self.db, self.env.es_index_prefix, self.env.database_query_timeout,
-            elastic_host=env.elastic_host, elastic_port=env.elastic_port,
-            timeout_counter=self.interrupt_count_metric
-        )
         self.running = False
         # hashX: List[int]
         self.hashX_raw_history_cache = LFUCacheWithMetrics(env.hashX_history_cache_size, metric_name='raw_history', namespace=NAMESPACE)
@@ -1284,7 +1278,7 @@ class LBRYElectrumX(asyncio.Protocol):
                 kwargs['channel_id'] = channel_claim.claim_hash.hex()
             return await self.session_manager.search_index.cached_search(kwargs)
         except ConnectionTimeout:
-            self.session_manager.interrupt_count_metric.inc()
+            self.session_manager.search_index.timeout_counter.inc()
             raise RPCError(JSONRPC.QUERY_TIMEOUT, 'query timed out')
         except TooManyClaimSearchParametersError as err:
             await asyncio.sleep(2)

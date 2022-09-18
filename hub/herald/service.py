@@ -1,18 +1,25 @@
 import time
 import typing
 import asyncio
+from prometheus_client import Counter
+from hub import PROMETHEUS_NAMESPACE
 from hub.scribe.daemon import LBCDaemon
 from hub.herald.session import SessionManager
 from hub.herald.mempool import HubMemPool
 from hub.herald.udp import StatusServer
 from hub.herald.db import HeraldDB
+from hub.herald.search import SearchIndex
 from hub.service import BlockchainReaderService
 from hub.notifier_protocol import ElasticNotifierClientProtocol
 if typing.TYPE_CHECKING:
     from hub.herald.env import ServerEnv
 
+NAMESPACE = f"{PROMETHEUS_NAMESPACE}_hub"
+
 
 class HubServerService(BlockchainReaderService):
+    interrupt_count_metric = Counter("interrupt", "Number of interrupted queries", namespace=NAMESPACE)
+
     def __init__(self, env: 'ServerEnv'):
         super().__init__(env, 'lbry-reader', thread_workers=max(1, env.max_query_workers), thread_prefix='hub-worker')
         self.env = env
@@ -21,8 +28,14 @@ class HubServerService(BlockchainReaderService):
         self.status_server = StatusServer()
         self.daemon = LBCDaemon(env.coin, env.daemon_url, daemon_ca_path=env.daemon_ca_path)  # only needed for broadcasting txs
         self.mempool = HubMemPool(self.env.coin, self.db)
+        self.search_index = SearchIndex(
+            self.db, self.env.es_index_prefix, self.env.database_query_timeout,
+            elastic_host=env.elastic_host, elastic_port=env.elastic_port,
+            timeout_counter=self.interrupt_count_metric
+        )
+
         self.session_manager = SessionManager(
-            env, self.db, self.mempool, self.daemon,
+            env, self.db, self.mempool, self.daemon, self.search_index,
             self.shutdown_event,
             on_available_callback=self.status_server.set_available,
             on_unavailable_callback=self.status_server.set_unavailable
@@ -52,7 +65,7 @@ class HubServerService(BlockchainReaderService):
         # self.mempool.notified_mempool_txs.clear()
 
     def clear_search_cache(self):
-        self.session_manager.search_index.clear_caches()
+        self.search_index.clear_caches()
 
     def advance(self, height: int):
         super().advance(height)
@@ -134,7 +147,7 @@ class HubServerService(BlockchainReaderService):
         self.block_count_metric.set(self.last_state.height)
         yield self.start_prometheus()
         yield self.start_cancellable(self.receive_es_notifications)
-        yield self.session_manager.search_index.start()
+        yield self.search_index.start()
         yield self.start_cancellable(self.session_manager.serve, self.mempool)
 
     def _iter_stop_tasks(self):
