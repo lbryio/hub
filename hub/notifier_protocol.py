@@ -2,6 +2,7 @@ import typing
 import struct
 import asyncio
 import logging
+from typing import Deque, Tuple
 
 
 log = logging.getLogger(__name__)
@@ -31,40 +32,27 @@ class ElasticNotifierProtocol(asyncio.Protocol):
 class ElasticNotifierClientProtocol(asyncio.Protocol):
     """notifies the reader when ES has written updates"""
 
-    def __init__(self, notifications: asyncio.Queue, host: str, port: int):
+    def __init__(self, notifications: asyncio.Queue, notifier_hosts: Deque[Tuple[Tuple[str, int], Tuple[str, int]]]):
+        assert len(notifier_hosts) > 0, 'no elastic notifier clients given'
         self.notifications = notifications
         self.transport: typing.Optional[asyncio.Transport] = None
-        self.host = host
-        self.port = port
-        self._lost_connection = asyncio.Event()
-        self._lost_connection.set()
+        self._notifier_hosts = notifier_hosts
+        self.lost_connection = asyncio.Event()
+        self.lost_connection.set()
+
+    @property
+    def host(self):
+        return self._notifier_hosts[0][1][0]
+
+    @property
+    def port(self):
+        return self._notifier_hosts[0][1][1]
 
     async def connect(self):
-        if self._lost_connection.is_set():
+        if self.lost_connection.is_set():
             await asyncio.get_event_loop().create_connection(
                 lambda: self, self.host, self.port
             )
-
-    async def maintain_connection(self, synchronized: asyncio.Event):
-        first_connect = True
-        if not self._lost_connection.is_set():
-            synchronized.set()
-        while True:
-            try:
-                await self._lost_connection.wait()
-                if not first_connect:
-                    log.warning("lost connection to scribe-elastic-sync notifier")
-                await self.connect()
-                first_connect = False
-                synchronized.set()
-                log.info("connected to es notifier")
-            except Exception as e:
-                if not isinstance(e, asyncio.CancelledError):
-                    log.warning("waiting 30s for scribe-elastic-sync notifier to become available (%s:%i)", self.host, self.port)
-                    await asyncio.sleep(30)
-                else:
-                    log.info("stopping the notifier loop")
-                    raise e
 
     def close(self):
         if self.transport and not self.transport.is_closing():
@@ -72,11 +60,11 @@ class ElasticNotifierClientProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self._lost_connection.clear()
+        self.lost_connection.clear()
 
     def connection_lost(self, exc) -> None:
         self.transport = None
-        self._lost_connection.set()
+        self.lost_connection.set()
 
     def data_received(self, data: bytes) -> None:
         try:
