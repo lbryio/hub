@@ -28,9 +28,10 @@ class HubServerService(BlockchainReaderService):
         self.status_server = StatusServer()
         self.daemon = LBCDaemon(env.coin, env.daemon_url, daemon_ca_path=env.daemon_ca_path)  # only needed for broadcasting txs
         self.mempool = HubMemPool(self.env.coin, self.db)
+
         self.search_index = SearchIndex(
             self.db, self.env.es_index_prefix, self.env.database_query_timeout,
-            elastic_host=env.elastic_host, elastic_port=env.elastic_port,
+            elastic_services=self.env.elastic_services,
             timeout_counter=self.interrupt_count_metric
         )
 
@@ -43,7 +44,7 @@ class HubServerService(BlockchainReaderService):
         self.mempool.session_manager = self.session_manager
         self.es_notifications = asyncio.Queue()
         self.es_notification_client = ElasticNotifierClientProtocol(
-            self.es_notifications, self.env.elastic_notifier_host, self.env.elastic_notifier_port
+            self.es_notifications, self.env.elastic_services
         )
         self.synchronized = asyncio.Event()
         self._es_height = None
@@ -129,7 +130,43 @@ class HubServerService(BlockchainReaderService):
                     self.log.info("es and reader are not yet in sync (block %s vs %s)", self._es_height,
                                   self.db.db_height)
         finally:
+            self.log.warning("closing es sync notification loop at %s", self._es_height)
             self.es_notification_client.close()
+
+    async def failover_elastic_services(self, synchronized: asyncio.Event):
+        first_connect = True
+        if not self.es_notification_client.lost_connection.is_set():
+            synchronized.set()
+
+        while True:
+            try:
+                await self.es_notification_client.lost_connection.wait()
+                if not first_connect:
+                    self.log.warning("lost connection to scribe-elastic-sync notifier (%s:%i)",
+                                     self.es_notification_client.host, self.es_notification_client.port)
+                await self.es_notification_client.connect()
+                first_connect = False
+                synchronized.set()
+                self.log.info("connected to es notifier on %s:%i", self.es_notification_client.host,
+                              self.es_notification_client.port)
+                await self.search_index.start()
+            except Exception as e:
+                if not isinstance(e, asyncio.CancelledError):
+                    self.log.warning("lost connection to scribe-elastic-sync notifier")
+                    await self.search_index.stop()
+                    self.search_index.clear_caches()
+                    if len(self.env.elastic_services) > 1:
+                        self.env.elastic_services.rotate(-1)
+                        self.log.warning("attempting to failover to %s:%i", self.es_notification_client.host,
+                                         self.es_notification_client.port)
+                        await asyncio.sleep(1)
+                    else:
+                        self.log.warning("waiting 30s for scribe-elastic-sync notifier to become available (%s:%i)",
+                                         self.es_notification_client.host, self.es_notification_client.port)
+                        await asyncio.sleep(30)
+                else:
+                    self.log.info("stopping the notifier loop")
+                    raise e
 
     async def start_status_server(self):
         if self.env.udp_port and int(self.env.udp_port):
@@ -140,14 +177,13 @@ class HubServerService(BlockchainReaderService):
 
     def _iter_start_tasks(self):
         yield self.start_status_server()
-        yield self.start_cancellable(self.es_notification_client.maintain_connection)
+        yield self.start_cancellable(self.receive_es_notifications)
+        yield self.start_cancellable(self.failover_elastic_services)
         yield self.start_cancellable(self.mempool.send_notifications_forever)
         yield self.start_cancellable(self.refresh_blocks_forever)
         yield self.finished_initial_catch_up.wait()
         self.block_count_metric.set(self.last_state.height)
         yield self.start_prometheus()
-        yield self.start_cancellable(self.receive_es_notifications)
-        yield self.search_index.start()
         yield self.start_cancellable(self.session_manager.serve, self.mempool)
 
     def _iter_stop_tasks(self):
