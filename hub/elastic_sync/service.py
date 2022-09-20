@@ -89,7 +89,10 @@ class ElasticSyncService(BlockchainReaderService):
         info = {}
         if os.path.exists(self._es_info_path):
             with open(self._es_info_path, 'r') as f:
-                info.update(json.loads(f.read()))
+                try:
+                    info.update(json.loads(f.read()))
+                except json.decoder.JSONDecodeError:
+                    self.log.warning('failed to parse es sync status file')
         self._last_wrote_height = int(info.get('height', 0))
         self._last_wrote_block_hash = info.get('block_hash', None)
 
