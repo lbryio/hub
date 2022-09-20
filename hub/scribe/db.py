@@ -82,6 +82,7 @@ class PrimaryDB(SecondaryDB):
             prefix_db.unsafe_commit()
             self.logger.info(f"wrote {hashX_cnt}/{len(hashXs)} hashXs statuses...")
         self._index_address_status = True
+        self.last_indexed_address_status_height = self.db_height
         self.write_db_state()
         self.prefix_db.unsafe_commit()
         self.logger.info("finished indexing address statuses")
@@ -101,17 +102,13 @@ class PrimaryDB(SecondaryDB):
 
     def write_db_state(self):
         """Write (UTXO) state to the batch."""
-        last_indexed_address_status = 0
         if self.db_height > 0:
             existing = self.prefix_db.db_state.get()
-            last_indexed_address_status = existing.hashX_status_last_indexed_height
             self.prefix_db.db_state.stage_delete((), existing.expanded)
-        if self._index_address_status:
-            last_indexed_address_status = self.db_height
         self.prefix_db.db_state.stage_put((), (
             self.genesis_bytes, self.db_height, self.db_tx_count, self.db_tip,
             self.utxo_flush_count, int(self.wall_time), self.catching_up, self._index_address_status, self.db_version,
             self.hist_flush_count, self.hist_comp_flush_count, self.hist_comp_cursor,
-            self.es_sync_height, last_indexed_address_status
+            self.es_sync_height, self.last_indexed_address_status_height
             )
         )

@@ -1486,8 +1486,11 @@ class BlockchainProcessorService(BlockchainService):
         # update hashX history status hashes and compactify the histories
         self._get_update_hashX_histories_ops(height)
 
+        # only compactify adddress histories and update the status index if we're already caught up,
+        # a bulk update will happen once catchup finishes
         if not self.db.catching_up and self.env.index_address_status:
             self._get_compactify_ops(height)
+            self.db.last_indexed_address_status_height = height
 
         self.tx_count = tx_count
         self.db.tx_counts.append(self.tx_count)
