@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import time
+import errno
 import codecs
 import typing
 import asyncio
@@ -273,6 +274,7 @@ class SessionManager:
         except OSError as e:    # don't suppress CancelledError
             self.logger.error(f'{kind} server failed to listen on {host}:'
                               f'{port:d} :{e!r}')
+            raise
         else:
             self.logger.info(f'{kind} server listening on {host}:{port:d}')
 
@@ -282,8 +284,19 @@ class SessionManager:
         """
         env = self.env
         host = env.cs_host()
-        if env.tcp_port is not None:
-            await self._start_server('TCP', host, env.tcp_port)
+        if env.tcp_port is None:
+            return
+        started = False
+        while not started:
+            try:
+                await self._start_server('TCP', host, env.tcp_port)
+                started = True
+            except OSError as e:
+                if e.errno is errno.EADDRINUSE:
+                    await asyncio.sleep(3)
+                    continue
+                raise
+
 
     async def _close_servers(self, kinds):
         """Close the servers of the given kinds (TCP etc.)."""
