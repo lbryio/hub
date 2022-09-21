@@ -1483,12 +1483,11 @@ class LBRYElectrumX(asyncio.Protocol):
         if len(addresses) > 1000:
             raise RPCError(BAD_REQUEST, f'too many addresses in subscription request: {len(addresses)}')
         hashXes = [item async for item in asyncify_for_loop((self.address_to_hashX(address) for address in addresses), 100)]
-        statuses = await self.get_hashX_statuses(hashXes)
         for hashX, alias in zip(hashXes, addresses):
             self.hashX_subs[hashX] = alias
             self.session_manager.hashx_subscriptions_by_session[hashX].add(id(self))
         self.session_manager.address_subscription_metric.inc(len(addresses))
-        return statuses
+        return await self.get_hashX_statuses(hashXes)
 
     async def address_unsubscribe(self, address):
         """Unsubscribe an address.
