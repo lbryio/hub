@@ -1,3 +1,4 @@
+import errno
 import os
 import json
 import typing
@@ -55,9 +56,24 @@ class ElasticSyncService(BlockchainReaderService):
         )
 
     async def run_es_notifier(self, synchronized: asyncio.Event):
-        server = await asyncio.get_event_loop().create_server(
-            lambda: ElasticNotifierProtocol(self._listeners), self.env.elastic_notifier_host, self.env.elastic_notifier_port
-        )
+        started = False
+        while not started:
+            try:
+                server = await asyncio.get_event_loop().create_server(
+                    lambda: ElasticNotifierProtocol(self._listeners),
+                    self.env.elastic_notifier_host,
+                    self.env.elastic_notifier_port
+                )
+                started = True
+            except Exception as e:
+                if not isinstance(e, asyncio.CancelledError):
+                    self.log.error(f'ES notifier server failed to listen on '
+                                   f'{self.env.elastic_notifier_host}:'
+                                   f'{self.env.elastic_notifier_port:d} : {e!r}')
+                if isinstance(e, OSError) and e.errno is errno.EADDRINUSE:
+                    await asyncio.sleep(3)
+                    continue
+                raise
         self.log.info("ES notifier server listening on TCP %s:%i", self.env.elastic_notifier_host,
                       self.env.elastic_notifier_port)
         synchronized.set()

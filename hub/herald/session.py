@@ -271,9 +271,10 @@ class SessionManager:
         host, port = args[:2]
         try:
             self.servers[kind] = await loop.create_server(protocol_factory, *args, **kw_args)
-        except OSError as e:    # don't suppress CancelledError
-            self.logger.error(f'{kind} server failed to listen on {host}:'
-                              f'{port:d} :{e!r}')
+        except Exception as e:
+            if not isinstance(e, asyncio.CancelledError):
+                self.logger.error(f'{kind} server failed to listen on '
+                                  f'{host}:{port:d} : {e!r}')
             raise
         else:
             self.logger.info(f'{kind} server listening on {host}:{port:d}')
