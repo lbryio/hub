@@ -1,6 +1,7 @@
 import sys
 import functools
 import typing
+import time
 from dataclasses import dataclass
 from struct import Struct
 from hub.schema.claim import Claim
@@ -192,3 +193,21 @@ class Block(typing.NamedTuple):
     raw: bytes
     header: bytes
     transactions: typing.List[Tx]
+
+    @property
+    def decoded_header(self):
+        header = self.header
+        version = int.from_bytes(header[:4], byteorder='little')
+        ts = time.gmtime(int.from_bytes(header[100:104], byteorder='little'))
+        timestamp = f"{ts.tm_year}-{ts.tm_mon}-{ts.tm_mday}"
+        bits = int.from_bytes(header[104:108], byteorder='little')
+        nonce = int.from_bytes(header[108:112], byteorder='little')
+        return {
+            'version': version,
+            'prev_block_hash': header[4:36][::-1].hex(),
+            'merkle_root': header[36:68][::-1].hex(),
+            'claim_trie_root': header[68:100][::-1].hex(),
+            'timestamp': timestamp,
+            'bits': bits,
+            'nonce': nonce
+        }
