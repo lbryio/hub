@@ -283,10 +283,8 @@ class BasePrefixDB:
         if len(keys) == 0:
             return []
         first_key = keys[0]
-        if not all(first_key[0] == key[0] for key in keys):
-            raise ValueError('cannot multi-delete across column families')
-        cf = self.column_families[first_key[:1]]
-        db_result = self._db.multi_get([(cf, k) for k in keys], fill_cache=fill_cache)
+        get_cf = self.column_families.__getitem__
+        db_result = self._db.multi_get([(get_cf(k[:1]), k) for k in keys], fill_cache=fill_cache)
         return list(db_result.values())
 
     def multi_delete(self, items: typing.List[typing.Tuple[bytes, bytes]]):
