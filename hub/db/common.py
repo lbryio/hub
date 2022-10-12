@@ -50,6 +50,7 @@ class DB_PREFIXES(enum.Enum):
     hashX_mempool_status = b'g'
     reposted_count = b'j'
     effective_amount = b'i'
+    future_effective_amount = b'k'
 
 
 COLUMN_SETTINGS = {}  # this is updated by the PrefixRow metaclass

@@ -1783,7 +1783,7 @@ class EffectiveAmountPrefixRow(PrefixRow):
     prefix = DB_PREFIXES.effective_amount.value
     key_struct = struct.Struct(b'>20s')
     value_struct = struct.Struct(b'>QQ')
-
+    cache_size = 1024 * 1024 * 64
     key_part_lambdas = [
         lambda: b'',
         struct.Struct(b'>20s').pack
@@ -1808,6 +1808,46 @@ class EffectiveAmountPrefixRow(PrefixRow):
     @classmethod
     def pack_item(cls, claim_hash: bytes,  effective_amount: int, support_sum: int):
         return cls.pack_key(claim_hash), cls.pack_value(effective_amount, support_sum)
+
+
+class FutureEffectiveAmountKey(NamedTuple):
+    claim_hash: bytes
+
+
+class FutureEffectiveAmountValue(NamedTuple):
+    future_effective_amount: int
+
+
+class FutureEffectiveAmountPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.future_effective_amount.value
+    key_struct = struct.Struct(b'>20s')
+    value_struct = struct.Struct(b'>Q')
+    cache_size = 1024 * 1024 * 64
+
+    key_part_lambdas = [
+        lambda: b'',
+        struct.Struct(b'>20s').pack
+    ]
+
+    @classmethod
+    def pack_key(cls, claim_hash: bytes):
+        return super().pack_key(claim_hash)
+
+    @classmethod
+    def unpack_key(cls, key: bytes) -> FutureEffectiveAmountKey:
+        return FutureEffectiveAmountKey(*super().unpack_key(key))
+
+    @classmethod
+    def pack_value(cls, future_effective_amount: int) -> bytes:
+        return super().pack_value(future_effective_amount)
+
+    @classmethod
+    def unpack_value(cls, data: bytes) -> FutureEffectiveAmountValue:
+        return FutureEffectiveAmountValue(*cls.value_struct.unpack(data))
+
+    @classmethod
+    def pack_item(cls, claim_hash: bytes,  future_effective_amount: int):
+        return cls.pack_key(claim_hash), cls.pack_value(future_effective_amount)
 
 
 class PrefixDB(BasePrefixDB):
@@ -1853,6 +1893,7 @@ class PrefixDB(BasePrefixDB):
         self.hashX_status = HashXStatusPrefixRow(db, self._op_stack)
         self.hashX_mempool_status = HashXMempoolStatusPrefixRow(db, self._op_stack)
         self.effective_amount = EffectiveAmountPrefixRow(db, self._op_stack)
+        self.future_effective_amount = FutureEffectiveAmountPrefixRow(db, self._op_stack)
 
 
 def auto_decode_item(key: bytes, value: bytes) -> Union[Tuple[NamedTuple, NamedTuple], Tuple[bytes, bytes]]:
