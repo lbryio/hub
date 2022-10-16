@@ -1166,9 +1166,6 @@ class SecondaryDB:
         v = self.prefix_db.txo_to_claim.get_pending(tx_num, position)
         return None if not v else v.claim_hash
 
-    def get_cached_claim_exists(self, tx_num: int, position: int) -> bool:
-        return self.get_cached_claim_hash(tx_num, position) is not None
-
     # Header merkle cache
 
     async def populate_header_merkle_cache(self):
