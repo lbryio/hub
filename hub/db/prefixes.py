@@ -1292,7 +1292,7 @@ class UTXOPrefixRow(PrefixRow):
     prefix = DB_PREFIXES.utxo.value
     key_struct = struct.Struct(b'>11sLH')
     value_struct = struct.Struct(b'>Q')
-
+    cache_size = 1024 * 1024 * 64
     key_part_lambdas = [
         lambda: b'',
         struct.Struct(b'>11s').pack,
@@ -1325,7 +1325,7 @@ class HashXUTXOPrefixRow(PrefixRow):
     prefix = DB_PREFIXES.hashx_utxo.value
     key_struct = struct.Struct(b'>4sLH')
     value_struct = struct.Struct(b'>11s')
-
+    cache_size = 1024 * 1024 * 64
     key_part_lambdas = [
         lambda: b'',
         struct.Struct(b'>4s').pack,
