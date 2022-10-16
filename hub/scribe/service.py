@@ -78,7 +78,7 @@ class BlockchainProcessorService(BlockchainService):
         # claim hash to lists of pending support txos
         self.support_txos_by_claim: DefaultDict[bytes, List[Tuple[int, int]]] = defaultdict(list)
         # support txo: (supported claim hash, support amount)
-        self.support_txo_to_claim: Dict[Tuple[int, int], Tuple[bytes, int]] = {}
+        self.support_txo_to_claim: Dict[Tuple[int, int], Tuple[bytes, int, str]] = {}
         # removed supports {name: {claim_hash: [(tx_num, nout), ...]}}
         self.removed_support_txos_by_name_by_claim: DefaultDict[str, DefaultDict[bytes, List[Tuple[int, int]]]] = \
             defaultdict(lambda: defaultdict(list))
@@ -496,7 +496,11 @@ class BlockchainProcessorService(BlockchainService):
     def _add_support(self, height: int, txo: 'TxOutput', tx_num: int, nout: int):
         supported_claim_hash = txo.support.claim_hash[::-1]
         self.support_txos_by_claim[supported_claim_hash].append((tx_num, nout))
-        self.support_txo_to_claim[(tx_num, nout)] = supported_claim_hash, txo.value
+        try:
+            normalized_name = normalize_name(txo.support.name.decode())
+        except UnicodeDecodeError:
+            normalized_name = ''.join(chr(x) for x in txo.support.name)
+        self.support_txo_to_claim[(tx_num, nout)] = supported_claim_hash, txo.value, normalized_name
         # print(f"\tsupport claim {supported_claim_hash.hex()} +{txo.value}")
 
         self.db.prefix_db.claim_to_support.stash_put((supported_claim_hash, tx_num, nout), (txo.value,))
@@ -714,10 +718,6 @@ class BlockchainProcessorService(BlockchainService):
             name, normalized_name, claim_hash, prev_amount, expiration, tx_num, nout, claim_root_tx_num,
             claim_root_idx, signature_is_valid, prev_signing_hash, reposted_claim_hash
         )
-        for support_txo_to_clear in self.support_txos_by_claim[claim_hash]:
-            self.support_txo_to_claim.pop(support_txo_to_clear)
-        self.support_txos_by_claim[claim_hash].clear()
-        self.support_txos_by_claim.pop(claim_hash)
         if normalized_name.startswith('@'):  # abandon a channel, invalidate signatures
             self._invalidate_channel_signatures(claim_hash)
 
@@ -947,7 +947,6 @@ class BlockchainProcessorService(BlockchainService):
             staged_is_controlling = False if not controlling else claim_hash == controlling.claim_hash
             controlling_is_abandoned = False if not controlling else \
                 name in names_with_abandoned_or_updated_controlling_claims
-
             if nothing_is_controlling or staged_is_controlling or controlling_is_abandoned:
                 delay = 0
             elif is_new_claim:
@@ -1035,24 +1034,27 @@ class BlockchainProcessorService(BlockchainService):
             )
 
         # and the supports
-        for (tx_num, nout), (claim_hash, amount) in self.support_txo_to_claim.items():
+        check_supported_claim_exists = set()
+        for (tx_num, nout), (claim_hash, amount, supported_name) in self.support_txo_to_claim.items():
             if claim_hash in self.abandoned_claims:
                 continue
             elif claim_hash in self.claim_hash_to_txo:
-                name = self.txo_to_claim[self.claim_hash_to_txo[claim_hash]].normalized_name
-                staged_is_new_claim = not self.txo_to_claim[self.claim_hash_to_txo[claim_hash]].is_update
+                delay = not self.txo_to_claim[self.claim_hash_to_txo[claim_hash]].is_update
             else:
-                supported_claim_info = self.db.get_claim_txo(claim_hash)
-                if not supported_claim_info:
-                    # the supported claim doesn't exist
-                    continue
-                else:
-                    v = supported_claim_info
-                name = v.normalized_name
-                staged_is_new_claim = (v.root_tx_num, v.root_position) == (v.tx_num, v.position)
+                check_supported_claim_exists.add(claim_hash)
+                delay = True
             get_delayed_activate_ops(
-                name, claim_hash, staged_is_new_claim, tx_num, nout, amount, is_support=True
+                supported_name, claim_hash, delay, tx_num, nout, amount, is_support=True
             )
+        check_supported_claim_exists = list(check_supported_claim_exists)
+        # claims that are supported that don't exist (yet, maybe never)
+        headless_supported_claims = {
+            claim_hash for claim_hash, v in zip(
+                check_supported_claim_exists, self.db.prefix_db.claim_to_txo.multi_get(
+                    [(c_h,) for c_h in check_supported_claim_exists]
+                )
+            ) if v is None
+        }
 
         activated_added_to_effective_amount = set()
 
@@ -1296,47 +1298,51 @@ class BlockchainProcessorService(BlockchainService):
                 elif not controlling or (winning_claim_hash != controlling.claim_hash and
                                        name in names_with_abandoned_or_updated_controlling_claims) or \
                         ((winning_claim_hash != controlling.claim_hash) and (amounts[winning_claim_hash] > amounts[controlling.claim_hash])):
-                    # print(f"\ttakeover by {winning_claim_hash.hex()} at {height}")
-                    if (name, winning_claim_hash) in need_reactivate_if_takes_over:
-                        previous_pending_activate = need_reactivate_if_takes_over[(name, winning_claim_hash)]
-                        amount = self.db.get_claim_txo_amount(
-                            winning_claim_hash
-                        )
-                        if winning_claim_hash in self.claim_hash_to_txo:
-                            tx_num, position = self.claim_hash_to_txo[winning_claim_hash]
-                            amount = self.txo_to_claim[(tx_num, position)].amount
-                        else:
-                            tx_num, position = previous_pending_activate.tx_num, previous_pending_activate.position
-                        if previous_pending_activate.height > height:
-                            # the claim had a pending activation in the future, move it to now
-                            if tx_num < self.tx_count:
-                                self.get_remove_activate_ops(
+                    if winning_claim_hash in headless_supported_claims:
+                        # print(f"\tclaim that would be winning {winning_claim_hash.hex()} at {height} does not exist, no takeover")
+                        pass
+                    else:
+                        # print(f"\ttakeover by {winning_claim_hash.hex()} at {height}")
+                        if (name, winning_claim_hash) in need_reactivate_if_takes_over:
+                            previous_pending_activate = need_reactivate_if_takes_over[(name, winning_claim_hash)]
+                            amount = self.db.get_claim_txo_amount(
+                                winning_claim_hash
+                            )
+                            if winning_claim_hash in self.claim_hash_to_txo:
+                                tx_num, position = self.claim_hash_to_txo[winning_claim_hash]
+                                amount = self.txo_to_claim[(tx_num, position)].amount
+                            else:
+                                tx_num, position = previous_pending_activate.tx_num, previous_pending_activate.position
+                            if previous_pending_activate.height > height:
+                                # the claim had a pending activation in the future, move it to now
+                                if tx_num < self.tx_count:
+                                    self.get_remove_activate_ops(
+                                        ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num,
+                                        position, previous_pending_activate.height, name, amount
+                                    )
+                                pending_activated = self.db.prefix_db.activated.get_pending(
+                                    ACTIVATED_CLAIM_TXO_TYPE, tx_num, position
+                                )
+                                if pending_activated:
+                                    self.get_remove_activate_ops(
+                                        ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num, position,
+                                        pending_activated.height, name, amount
+                                    )
+                                self.get_activate_ops(
                                     ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num,
-                                    position, previous_pending_activate.height, name, amount
+                                    position, height, name, amount
                                 )
-                            pending_activated = self.db.prefix_db.activated.get_pending(
-                                ACTIVATED_CLAIM_TXO_TYPE, tx_num, position
+                                if winning_claim_hash not in activated_added_to_effective_amount:
+                                    self.effective_amount_delta[winning_claim_hash] += amount
+                        self.taken_over_names.add(name)
+                        if controlling:
+                            self.db.prefix_db.claim_takeover.stash_delete(
+                                (name,), (controlling.claim_hash, controlling.height)
                             )
-                            if pending_activated:
-                                self.get_remove_activate_ops(
-                                    ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num, position,
-                                    pending_activated.height, name, amount
-                                )
-                            self.get_activate_ops(
-                                ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num,
-                                position, height, name, amount
-                            )
-                            if winning_claim_hash not in activated_added_to_effective_amount:
-                                self.effective_amount_delta[winning_claim_hash] += amount
-                    self.taken_over_names.add(name)
-                    if controlling:
-                        self.db.prefix_db.claim_takeover.stash_delete(
-                            (name,), (controlling.claim_hash, controlling.height)
-                        )
-                    self.db.prefix_db.claim_takeover.stash_put((name,), (winning_claim_hash, height))
-                    if controlling and controlling.claim_hash not in self.abandoned_claims:
-                        self.touched_claim_hashes.add(controlling.claim_hash)
-                    self.touched_claim_hashes.add(winning_claim_hash)
+                        self.db.prefix_db.claim_takeover.stash_put((name,), (winning_claim_hash, height))
+                        if controlling and controlling.claim_hash not in self.abandoned_claims:
+                            self.touched_claim_hashes.add(controlling.claim_hash)
+                        self.touched_claim_hashes.add(winning_claim_hash)
                 elif winning_claim_hash == controlling.claim_hash:
                     # print("\tstill winning")
                     pass
@@ -1526,14 +1532,6 @@ class BlockchainProcessorService(BlockchainService):
             for claim_hash, v in current_effective_amount_values.items() if v is not None
         ]
         claims = set(self.effective_amount_delta.keys()).union(self.active_support_amount_delta.keys())
-        claims = claims.difference(self.abandoned_claims.keys())
-        # check that all of the claims exist, it's possible we got supports for claims that don't exist
-        missing = set()
-        for claim_hash, claim_txo in zip(
-                claims, self.db.prefix_db.claim_to_txo.multi_get([(claim_hash,) for claim_hash in claims])):
-            if not claim_txo and claim_hash not in self.claim_hash_to_txo:
-                missing.add(claim_hash)  # it's a support for a claim that doesn't exist
-        claims = claims.difference(missing)
         new_effective_amounts = {
             claim_hash: ((current_effective_amounts.get(claim_hash, 0) or 0) + self.effective_amount_delta.get(claim_hash, 0),
                          (current_supports_amount.get(claim_hash, 0) or 0) + self.active_support_amount_delta.get(claim_hash, 0))
