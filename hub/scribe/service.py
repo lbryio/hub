@@ -224,10 +224,14 @@ class BlockchainProcessorService(BlockchainService):
                         return
                     start = time.perf_counter()
                     start_count = self.tx_count
-                    txo_count = await self.run_in_thread_with_lock(self.advance_block, block)
+                    txi_count, txo_count, c_added, c_spent, s_added, s_spent, abandoned, abandoned_chan = await self.run_in_thread_with_lock(
+                        self.advance_block, block
+                    )
+                    txs_added = self.tx_count - start_count
                     self.log.info(
-                        "writer advanced to %i (%i txs, %i txos) in %0.3fs", self.height, self.tx_count - start_count,
-                        txo_count, time.perf_counter() - start
+                        "advanced to %i, %i(+%i) txs, -%i/+%i utxos, -%i/+%i claims (%i/%i abandoned), -%i/+%i supports in %0.3fs", self.height,
+                        self.tx_count, txs_added, txi_count, txo_count, c_spent, c_added, abandoned, abandoned_chan, s_spent, s_added,
+                        time.perf_counter() - start
                     )
                     if self.height == self.coin.nExtendedClaimExpirationForkHeight:
                         self.log.warning(
@@ -1551,8 +1555,8 @@ class BlockchainProcessorService(BlockchainService):
             spend_utxos(tx_count, spent_txos)
 
             # Add the new UTXOs
+            txo_count += len(tx.outputs)
             for nout, txout in enumerate(tx.outputs):
-                txo_count += 1
                 # Get the hashX.  Ignore unspendable outputs
                 hashX = add_utxo(tx_hash, tx_count, nout, txout)
                 if hashX:
@@ -1560,9 +1564,13 @@ class BlockchainProcessorService(BlockchainService):
                     if tx_count not in self.hashXs_by_tx[hashX]:
                         self.hashXs_by_tx[hashX].append(tx_count)
                 # add claim/support txo
-                add_claim_or_support(
+                added_claim_or_support = add_claim_or_support(
                     height, tx_hash, tx_count, nout, txout, spent_claims, tx.inputs[0]
                 )
+                if added_claim_or_support == 1:
+                    claim_added_count += 1
+                elif added_claim_or_support == 2:
+                    support_added_count += 1
 
             # Handle abandoned claims
             abandoned_channels = {}
@@ -1570,8 +1578,10 @@ class BlockchainProcessorService(BlockchainService):
             # see test_abandon_channel_and_claims_in_same_tx
             for abandoned_claim_hash, (tx_num, nout, normalized_name) in spent_claims.items():
                 if normalized_name.startswith('@'):
+                    abandoned_chans_cnt += 1
                     abandoned_channels[abandoned_claim_hash] = (tx_num, nout, normalized_name)
                 else:
+                    abandoned_cnt += 1
                     # print(f"\tabandon {normalized_name} {abandoned_claim_hash.hex()} {tx_num} {nout}")
                     self._abandon_claim(abandoned_claim_hash, tx_num, nout, normalized_name)
 
@@ -1647,7 +1657,7 @@ class BlockchainProcessorService(BlockchainService):
         self.clear_after_advance_or_reorg()
         self.db.assert_db_state()
         # print("*************\n")
-        return txo_count
+        return txi_count, txo_count, claim_added_count, claim_spent_count, support_added_count, support_spent_count, abandoned_cnt, abandoned_chans_cnt
 
     def _get_clear_mempool_ops(self):
         self.db.prefix_db.multi_delete(
