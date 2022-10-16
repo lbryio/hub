@@ -1852,9 +1852,11 @@ class FutureEffectiveAmountPrefixRow(PrefixRow):
 
 class PrefixDB(BasePrefixDB):
     def __init__(self, path: str, reorg_limit: int = 200, max_open_files: int = 64,
-                 secondary_path: str = '', unsafe_prefixes: Optional[typing.Set[bytes]] = None):
+                 secondary_path: str = '', unsafe_prefixes: Optional[typing.Set[bytes]] = None,
+                 enforce_integrity: bool = True):
         super().__init__(path, max_open_files=max_open_files, secondary_path=secondary_path,
-                         max_undo_depth=reorg_limit, unsafe_prefixes=unsafe_prefixes)
+                         max_undo_depth=reorg_limit, unsafe_prefixes=unsafe_prefixes,
+                         enforce_integrity=enforce_integrity)
         db = self._db
         self.claim_to_support = ClaimToSupportPrefixRow(db, self._op_stack)
         self.support_to_claim = SupportToClaimPrefixRow(db, self._op_stack)

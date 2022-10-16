@@ -13,9 +13,10 @@ class PrimaryDB(SecondaryDB):
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
                  max_open_files: int = 64, blocking_channel_ids: List[str] = None,
                  filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
-                 index_address_status=False):
+                 index_address_status=False, enforce_integrity=True):
         super().__init__(coin, db_dir, '', max_open_files, reorg_limit, cache_all_claim_txos, cache_all_tx_hashes,
-                         blocking_channel_ids, filtering_channel_ids, executor, index_address_status)
+                         blocking_channel_ids, filtering_channel_ids, executor, index_address_status,
+                         enforce_integrity=enforce_integrity)
 
     def _rebuild_hashX_status_index(self, start_height: int):
         self.logger.warning("rebuilding the address status index...")

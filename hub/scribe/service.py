@@ -138,7 +138,8 @@ class BlockchainProcessorService(BlockchainService):
             env.coin, env.db_dir, env.reorg_limit, cache_all_claim_txos=env.cache_all_claim_txos,
             cache_all_tx_hashes=env.cache_all_tx_hashes, max_open_files=env.db_max_open_files,
             blocking_channel_ids=env.blocking_channel_ids, filtering_channel_ids=env.filtering_channel_ids,
-            executor=self._executor, index_address_status=env.index_address_status
+            executor=self._executor, index_address_status=env.index_address_status,
+            enforce_integrity=not env.db_disable_integrity_checks
         )
 
     async def run_in_thread_with_lock(self, func, *args):
