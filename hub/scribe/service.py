@@ -953,8 +953,9 @@ class BlockchainProcessorService(BlockchainService):
             elif is_new_claim:
                 delay = self.coin.get_delay_for_name(height - controlling.height)
             else:
-                controlling_effective_amount = self._get_pending_effective_amount(name, controlling.claim_hash)
-                staged_effective_amount = self._get_pending_effective_amount(name, claim_hash)
+                _amounts = self._get_pending_effective_amounts([(name, controlling.claim_hash), (name, claim_hash)])
+                controlling_effective_amount = _amounts[controlling.claim_hash]
+                staged_effective_amount = _amounts[claim_hash]
                 staged_update_could_cause_takeover = staged_effective_amount > controlling_effective_amount
                 delay = 0 if not staged_update_could_cause_takeover else self.coin.get_delay_for_name(
                     height - controlling.height
@@ -1140,23 +1141,49 @@ class BlockchainProcessorService(BlockchainService):
         # upon the delayed activation of B, we need to detect to activate C and make it take over early instead
 
         claim_exists = {}
-        for activated, activated_claim_txo in self.db.get_future_activated(height).items():
-            # uses the pending effective amount for the future activation height, not the current height
-            future_amount = self._get_pending_claim_amount(
-                activated.normalized_name, activated.claim_hash, activated_claim_txo.height + 1
-            )
-            if activated.claim_hash not in claim_exists:
-                claim_exists[activated.claim_hash] = activated.claim_hash in self.claim_hash_to_txo or (
-                        self.db.get_claim_txo(activated.claim_hash) is not None)
-            if claim_exists[activated.claim_hash] and activated.claim_hash not in self.abandoned_claims:
-                v = future_amount, activated, activated_claim_txo
-                future_activations[activated.normalized_name][activated.claim_hash] = v
+        needed_future_activated = {}
 
+        future_activated = self.db.get_future_activated(height)
+
+        needed_future_activated_amounts = []
+
+        for activated, activated_claim_txo in future_activated.items():
+            needed_future_activated_amounts.append(activated.claim_hash)
+
+        future_amounts = self._get_future_effective_amounts(needed_future_activated_amounts)
+
+        for activated, activated_claim_txo in future_activated.items():
+            # uses the pending effective amount for the future activation height, not the current height
+            future_amount = future_amounts[activated.claim_hash]
+            if activated.claim_hash in self.claim_hash_to_txo:
+                claim_exists[activated.claim_hash] = True
+            needed_future_activated[activated.claim_hash] = activated, activated_claim_txo, future_amount
+
+        if needed_future_activated:
+            for (claim_hash, (activated, activated_claim_txo, future_amount)), claim_txo in zip(
+                    needed_future_activated.items(), self.db.prefix_db.claim_to_txo.multi_get(
+                        [(c_h,) for c_h in needed_future_activated]
+                    )):
+                if claim_hash not in claim_exists:
+                   claim_exists[claim_hash] = claim_txo is not None
+                if claim_exists[activated.claim_hash] and activated.claim_hash not in self.abandoned_claims:
+                    future_activations[activated.normalized_name][activated.claim_hash] = future_amount, \
+                                                                                          activated, \
+                                                                                          activated_claim_txo
+        check_exists = set()
         for name, future_activated in activate_in_future.items():
             for claim_hash, activated in future_activated.items():
                 if claim_hash not in claim_exists:
-                    claim_exists[claim_hash] = claim_hash in self.claim_hash_to_txo or (
-                            self.db.get_claim_txo(claim_hash) is not None)
+                    check_exists.add(claim_hash)
+
+        if check_exists:
+            check_exists = list(check_exists)
+            for claim_hash, claim_txo in zip(check_exists, self.db.prefix_db.claim_to_txo.multi_get(
+                    [(c_h,) for c_h in check_exists])):
+                claim_exists[claim_hash] = (claim_txo is not None) or claim_hash in self.claim_hash_to_txo
+
+        for name, future_activated in activate_in_future.items():
+            for claim_hash, activated in future_activated.items():
                 if not claim_exists[claim_hash]:
                     continue
                 if claim_hash in self.abandoned_claims:
@@ -1170,28 +1197,35 @@ class BlockchainProcessorService(BlockchainService):
                         self.possible_future_support_amounts_by_claim_hash[claim_hash].append(txo[1])
 
         # process takeovers
+
+        need_activated_amounts = []
+        for name, activated in self.activation_by_claim_by_name.items():
+            for claim_hash in activated.keys():
+                if claim_hash not in self.abandoned_claims:
+                    need_activated_amounts.append((name, claim_hash))
+            controlling = controlling_claims[name]
+            # if there is a controlling claim include it in the amounts to ensure it remains the max
+            if controlling and controlling.claim_hash not in self.abandoned_claims:
+                need_activated_amounts.append((name, controlling.claim_hash))
+        cumulative_amounts = self._get_pending_effective_amounts(need_activated_amounts)
+
         checked_names = set()
         for name, activated in self.activation_by_claim_by_name.items():
             checked_names.add(name)
             controlling = controlling_claims[name]
             amounts = {
-                claim_hash: self._get_pending_effective_amount(name, claim_hash)
+                claim_hash: cumulative_amounts[claim_hash]
                 for claim_hash in activated.keys() if claim_hash not in self.abandoned_claims
             }
-            # if there is a controlling claim include it in the amounts to ensure it remains the max
             if controlling and controlling.claim_hash not in self.abandoned_claims:
-                amounts[controlling.claim_hash] = self._get_pending_effective_amount(name, controlling.claim_hash)
+                amounts[controlling.claim_hash] = cumulative_amounts[controlling.claim_hash]
             winning_claim_hash = max(amounts, key=lambda x: amounts[x])
             if not controlling or (winning_claim_hash != controlling.claim_hash and
                                    name in names_with_abandoned_or_updated_controlling_claims) or \
                     ((winning_claim_hash != controlling.claim_hash) and (amounts[winning_claim_hash] > amounts[controlling.claim_hash])):
                 amounts_with_future_activations = {claim_hash: amount for claim_hash, amount in amounts.items()}
-                amounts_with_future_activations.update(
-                    {
-                        claim_hash: self._get_pending_effective_amount(
-                            name, claim_hash, self.height + 1 + self.coin.maxTakeoverDelay
-                        ) for claim_hash in future_activations[name]
-                    }
+                amounts_with_future_activations.update(self._get_future_effective_amounts(
+                    list(future_activations[name].keys()))
                 )
                 winning_including_future_activations = max(
                     amounts_with_future_activations, key=lambda x: amounts_with_future_activations[x]
@@ -1308,12 +1342,13 @@ class BlockchainProcessorService(BlockchainService):
                 continue
             checked_names.add(name)
             controlling = get_controlling(name)
-            amounts = {
-                claim_hash: self._get_pending_effective_amount(name, claim_hash)
-                for claim_hash in self.db.get_claims_for_name(name) if claim_hash not in self.abandoned_claims
-            }
+            needed_amounts = [
+                claim_hash for claim_hash in self.db.get_claims_for_name(name)
+                if claim_hash not in self.abandoned_claims
+            ]
             if controlling and controlling.claim_hash not in self.abandoned_claims:
-                amounts[controlling.claim_hash] = self._get_pending_effective_amount(name, controlling.claim_hash)
+                needed_amounts.append(controlling.claim_hash)
+            amounts = self._get_pending_effective_amounts([(name, claim_hash) for claim_hash in needed_amounts])
             winning = max(amounts, key=lambda x: amounts[x])
 
             if (controlling and winning != controlling.claim_hash) or (not controlling and winning):
@@ -1404,13 +1439,31 @@ class BlockchainProcessorService(BlockchainService):
                         (removed_claim.normalized_name, amt.effective_amount, amt.tx_num, amt.position), (removed,)
                     )
         # update or insert new bid orders and prepare to update the effective amount index
+        touched_claim_hashes = list(self.touched_claim_hashes)
+        touched_claims = {
+            claim_hash: v if v is not None else self.txo_to_claim[self.claim_hash_to_txo[claim_hash]]
+                        if claim_hash in self.claim_hash_to_txo else None
+            for claim_hash, v in zip(
+                touched_claim_hashes,
+                self.db.prefix_db.claim_to_txo.multi_get(
+                    [(claim_hash,) for claim_hash in touched_claim_hashes]
+                )
+            )
+        }
+        needed_effective_amounts = [
+            (v.normalized_name, claim_hash) for claim_hash, v in touched_claims.items() if v is not None
+        ]
+        touched_effective_amounts = self._get_pending_effective_amounts(
+            needed_effective_amounts
+        )
+
         for touched in self.touched_claim_hashes:
             prev_effective_amount = 0
 
             if touched in self.claim_hash_to_txo:
                 pending = self.txo_to_claim[self.claim_hash_to_txo[touched]]
                 name, tx_num, position = pending.normalized_name, pending.tx_num, pending.position
-                claim_from_db = self.db.get_claim_txo(touched)
+                claim_from_db = touched_claims[touched]
                 if claim_from_db:
                     claim_amount_info = self.db.get_url_effective_amount(name, touched)
                     if claim_amount_info:
@@ -1420,7 +1473,7 @@ class BlockchainProcessorService(BlockchainService):
                              claim_amount_info.position), (touched,)
                         )
             else:
-                v = self.db.get_claim_txo(touched)
+                v = touched_claims[touched]
                 if not v:
                     continue
                 name, tx_num, position = v.normalized_name, v.tx_num, v.position
