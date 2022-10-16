@@ -818,31 +818,62 @@ class BlockchainProcessorService(BlockchainService):
                 # print(f"\texpire {abandoned_claim_hash.hex()} {tx_num} {nout}")
                 self._abandon_claim(abandoned_claim_hash, tx_num, nout, normalized_name)
 
-    def _cached_get_active_amount(self, claim_hash: bytes, txo_type: int, height: int) -> int:
-        if (claim_hash, txo_type, height) in self.amount_cache:
-            return self.amount_cache[(claim_hash, txo_type, height)]
-        if txo_type == ACTIVATED_CLAIM_TXO_TYPE:
-            if claim_hash in self.claim_hash_to_txo:
-                amount = self.txo_to_claim[self.claim_hash_to_txo[claim_hash]].amount
-            else:
-                amount = self.db.get_active_amount_as_of_height(
-                    claim_hash, height
-                )
-            self.amount_cache[(claim_hash, txo_type, height)] = amount
-        else:
-            self.amount_cache[(claim_hash, txo_type, height)] = amount = self.db._get_active_amount(
-                claim_hash, txo_type, height
-            )
-        return amount
-
-    def _get_pending_claim_amount(self, name: str, claim_hash: bytes, height=None) -> int:
-        if (name, claim_hash) in self.activated_claim_amount_by_name_and_hash:
+    def _get_pending_effective_amounts(self, names_and_claim_hashes: List[Tuple[str, bytes]]):
+        def _get_pending_claim_amount(name: str, claim_hash: bytes) -> Optional[int]:
+            if (name, claim_hash) in self.activated_claim_amount_by_name_and_hash:
+                if claim_hash in self.claim_hash_to_txo:
+                    return self.txo_to_claim[self.claim_hash_to_txo[claim_hash]].amount
+                return self.activated_claim_amount_by_name_and_hash[(name, claim_hash)]
+            if (name, claim_hash) in self.possible_future_claim_amount_by_name_and_hash:
+                return self.possible_future_claim_amount_by_name_and_hash[(name, claim_hash)]
+            if (claim_hash, ACTIVATED_CLAIM_TXO_TYPE, self.height + 1) in self.amount_cache:
+                return self.amount_cache[(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, self.height + 1)]
             if claim_hash in self.claim_hash_to_txo:
                 return self.txo_to_claim[self.claim_hash_to_txo[claim_hash]].amount
-            return self.activated_claim_amount_by_name_and_hash[(name, claim_hash)]
-        if (name, claim_hash) in self.possible_future_claim_amount_by_name_and_hash:
-            return self.possible_future_claim_amount_by_name_and_hash[(name, claim_hash)]
-        return self._cached_get_active_amount(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, height or (self.height + 1))
+            else:
+                return
+
+        def _get_pending_support_amount(claim_hash):
+            amount = 0
+            if claim_hash in self.activated_support_amount_by_claim:
+                amount += sum(self.activated_support_amount_by_claim[claim_hash])
+            if claim_hash in self.possible_future_support_amounts_by_claim_hash:
+                amount += sum(self.possible_future_support_amounts_by_claim_hash[claim_hash])
+            if claim_hash in self.removed_active_support_amount_by_claim:
+                amount -= sum(self.removed_active_support_amount_by_claim[claim_hash])
+            if (claim_hash, ACTIVATED_SUPPORT_TXO_TYPE, self.height + 1) in self.amount_cache:
+                amount += self.amount_cache[(claim_hash, ACTIVATED_SUPPORT_TXO_TYPE, self.height + 1)]
+                return amount, False
+            return amount, True
+
+        amount_infos = {}
+        for name, claim_hash in names_and_claim_hashes:
+            claim_amount = _get_pending_claim_amount(name, claim_hash)
+            support_amount, need_supports = _get_pending_support_amount(claim_hash)
+            amount_infos[claim_hash] = claim_amount is None, need_supports, (claim_amount or 0) + support_amount
+
+        needed_amounts = [
+            claim_hash for claim_hash, (need_claim, need_support, _) in amount_infos.items()
+            if need_claim or need_support
+        ]
+        amounts = {
+            claim_hash: v for claim_hash, v in zip(
+                needed_amounts, self.db.prefix_db.effective_amount.multi_get([(c_h,) for c_h in needed_amounts])
+            )
+        }
+        pending_effective_amounts = {}
+        for claim_hash, (need_claim, need_support, pending_amount) in amount_infos.items():
+            amount = pending_amount
+            if (not need_claim and not need_support) or not amounts[claim_hash]:
+                pending_effective_amounts[claim_hash] = amount
+                continue
+            existing = amounts[claim_hash]
+            if need_claim:
+                amount += (existing.activated_sum - existing.activated_support_sum)
+            if need_support:
+                amount += existing.activated_support_sum
+            pending_effective_amounts[claim_hash] = amount
+        return pending_effective_amounts
 
     def _get_pending_claim_name(self, claim_hash: bytes) -> Optional[str]:
         assert claim_hash is not None
@@ -864,20 +895,6 @@ class BlockchainProcessorService(BlockchainService):
                 )
             )
         }
-    def _get_pending_supported_amount(self, claim_hash: bytes, height: Optional[int] = None) -> int:
-        amount = self._cached_get_active_amount(claim_hash, ACTIVATED_SUPPORT_TXO_TYPE, height or (self.height + 1))
-        if claim_hash in self.activated_support_amount_by_claim:
-            amount += sum(self.activated_support_amount_by_claim[claim_hash])
-        if claim_hash in self.possible_future_support_amounts_by_claim_hash:
-            amount += sum(self.possible_future_support_amounts_by_claim_hash[claim_hash])
-        if claim_hash in self.removed_active_support_amount_by_claim:
-            return amount - sum(self.removed_active_support_amount_by_claim[claim_hash])
-        return amount
-
-    def _get_pending_effective_amount(self, name: str, claim_hash: bytes, height: Optional[int] = None) -> int:
-        claim_amount = self._get_pending_claim_amount(name, claim_hash, height=height)
-        support_amount = self._get_pending_supported_amount(claim_hash, height=height)
-        return claim_amount + support_amount
 
     def get_activate_ops(self, txo_type: int, claim_hash: bytes, tx_num: int, position: int,
                           activation_height: int, name: str, amount: int):
