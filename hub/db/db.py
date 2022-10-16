@@ -34,7 +34,7 @@ NAMESPACE = f"{PROMETHEUS_NAMESPACE}_db"
 
 
 class SecondaryDB:
-    DB_VERSIONS = [7, 8, 9, 10, 11]
+    DB_VERSIONS = [7, 8, 9, 10, 11, 12]
 
     def __init__(self, coin, db_dir: str, secondary_name: str, max_open_files: int = -1, reorg_limit: int = 200,
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,

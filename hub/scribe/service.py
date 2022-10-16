@@ -2145,6 +2145,9 @@ class BlockchainProcessorService(BlockchainService):
             elif self.db.db_version == 10:
                 from hub.db.migrators.migrate10to11 import migrate, FROM_VERSION, TO_VERSION
                 self.db._index_address_status = self.env.index_address_status
+            elif self.db.db_version == 11:
+                from hub.db.migrators.migrate11to12 import migrate, FROM_VERSION, TO_VERSION
+                self.db._index_address_status = self.env.index_address_status
             else:
                 raise RuntimeError("unknown db version")
             self.log.warning(f"migrating database from version {FROM_VERSION} to version {TO_VERSION}")
