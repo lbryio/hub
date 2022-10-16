@@ -524,11 +524,16 @@ class SecondaryDB:
             if not v:
                 return 0
             return v.activated_sum - v.activated_support_sum
+        amount = 0
+        v = self.prefix_db.effective_amount.get(claim_hash)
+        if v:
+            amount = v.activated_sum - v.activated_support_sum
         for v in self.prefix_db.active_amount.iterate(
-                start=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, 0), stop=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, height),
+                start=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, self.db_height + 1),
+                stop=(claim_hash, ACTIVATED_CLAIM_TXO_TYPE, height),
                 include_key=False, reverse=True):
             return v.amount
-        return 0
+        return amount
 
     def get_effective_amount(self, claim_hash: bytes) -> int:
         v = self.prefix_db.effective_amount.get(claim_hash)
