@@ -89,6 +89,12 @@ class PrefixRow(metaclass=PrefixRowType):
         if v:
             return v if not deserialize_value else self.unpack_value(v)
 
+    def key_exists(self, *key_args):
+        key_may_exist, _ = self._db.key_may_exist((self._column_family, self.pack_key(*key_args)))
+        if not key_may_exist:
+            return False
+        return self._db.get((self._column_family, self.pack_key(*key_args)), fill_cache=True) is not None
+
     def multi_get(self, key_args: typing.List[typing.Tuple], fill_cache=True, deserialize_value=True):
         packed_keys = {tuple(args): self.pack_key(*args) for args in key_args}
         db_result = self._db.multi_get([(self._column_family, packed_keys[tuple(args)]) for args in key_args],
@@ -118,26 +124,28 @@ class PrefixRow(metaclass=PrefixRowType):
             if idx % step == 0:
                 await asyncio.sleep(0)
 
-    def stage_multi_put(self, items):
-        self._op_stack.multi_put([RevertablePut(self.pack_key(*k), self.pack_value(*v)) for k, v in items])
+    def stash_multi_put(self, items):
+        self._op_stack.stash_ops([RevertablePut(self.pack_key(*k), self.pack_value(*v)) for k, v in items])
+
+    def stash_multi_delete(self, items):
+        self._op_stack.stash_ops([RevertableDelete(self.pack_key(*k), self.pack_value(*v)) for k, v in items])
 
     def get_pending(self, *key_args, fill_cache=True, deserialize_value=True):
         packed_key = self.pack_key(*key_args)
-        last_op = self._op_stack.get_last_op_for_key(packed_key)
-        if last_op:
-            if last_op.is_put:
-                return last_op.value if not deserialize_value else self.unpack_value(last_op.value)
-            else:  # it's a delete
-                return
-        v = self._db.get((self._column_family, packed_key), fill_cache=fill_cache)
-        if v:
-            return v if not deserialize_value else self.unpack_value(v)
+        pending_op = self._op_stack.get_pending_op(packed_key)
+        if pending_op and pending_op.is_delete:
+            return
+        if pending_op:
+            v = pending_op.value
+        else:
+            v = self._db.get((self._column_family, packed_key), fill_cache=fill_cache)
+        return None if v is None else (v if not deserialize_value else self.unpack_value(v))
 
-    def stage_put(self, key_args=(), value_args=()):
-        self._op_stack.append_op(RevertablePut(self.pack_key(*key_args), self.pack_value(*value_args)))
+    def stash_put(self, key_args=(), value_args=()):
+        self._op_stack.stash_ops([RevertablePut(self.pack_key(*key_args), self.pack_value(*value_args))])
 
-    def stage_delete(self, key_args=(), value_args=()):
-        self._op_stack.append_op(RevertableDelete(self.pack_key(*key_args), self.pack_value(*value_args)))
+    def stash_delete(self, key_args=(), value_args=()):
+        self._op_stack.stash_ops([RevertableDelete(self.pack_key(*key_args), self.pack_value(*value_args))])
 
     @classmethod
     def pack_partial_key(cls, *args) -> bytes:
@@ -181,7 +189,7 @@ class BasePrefixDB:
             settings = COLUMN_SETTINGS[prefix.value]
             column_family_options[prefix.value] = rocksdb.ColumnFamilyOptions()
             column_family_options[prefix.value].table_factory = rocksdb.BlockBasedTableFactory(
-                block_cache=rocksdb.LRUCache(settings['cache_size']),
+                block_cache=rocksdb.LRUCache(settings['cache_size'])
             )
         self.column_families: typing.Dict[bytes, 'rocksdb.ColumnFamilyHandle'] = {}
         options = rocksdb.Options(
@@ -206,6 +214,7 @@ class BasePrefixDB:
         Write staged changes to the database without keeping undo information
         Changes written cannot be undone
         """
+        self.apply_stash()
         try:
             if not len(self._op_stack):
                 return
@@ -226,6 +235,7 @@ class BasePrefixDB:
         """
         Write changes for a block height to the database and keep undo information so that the changes can be reverted
         """
+        self.apply_stash()
         undo_ops = self._op_stack.get_undo_ops()
         delete_undos = []
         if height > self._max_undo_depth:
@@ -275,6 +285,9 @@ class BasePrefixDB:
         finally:
             self._op_stack.clear()
 
+    def apply_stash(self):
+        self._op_stack.validate_and_apply_stashed_ops()
+
     def get(self, key: bytes, fill_cache: bool = True) -> Optional[bytes]:
         cf = self.column_families[key[:1]]
         return self._db.get((cf, key), fill_cache=fill_cache)
@@ -282,16 +295,15 @@ class BasePrefixDB:
     def multi_get(self, keys: typing.List[bytes], fill_cache=True):
         if len(keys) == 0:
             return []
-        first_key = keys[0]
         get_cf = self.column_families.__getitem__
         db_result = self._db.multi_get([(get_cf(k[:1]), k) for k in keys], fill_cache=fill_cache)
         return list(db_result.values())
 
     def multi_delete(self, items: typing.List[typing.Tuple[bytes, bytes]]):
-        self._op_stack.multi_delete([RevertableDelete(k, v) for k, v in items])
+        self._op_stack.stash_ops([RevertableDelete(k, v) for k, v in items])
 
     def multi_put(self, items: typing.List[typing.Tuple[bytes, bytes]]):
-        self._op_stack.multi_put([RevertablePut(k, v) for k, v in items])
+        self._op_stack.stash_ops([RevertablePut(k, v) for k, v in items])
 
     def iterator(self, start: bytes, column_family: 'rocksdb.ColumnFamilyHandle' = None,
                  iterate_lower_bound: bytes = None, iterate_upper_bound: bytes = None,
@@ -310,11 +322,11 @@ class BasePrefixDB:
     def try_catch_up_with_primary(self):
         self._db.try_catch_up_with_primary()
 
-    def stage_raw_put(self, key: bytes, value: bytes):
-        self._op_stack.append_op(RevertablePut(key, value))
+    def stash_raw_put(self, key: bytes, value: bytes):
+        self._op_stack.stash_ops([RevertablePut(key, value)])
 
-    def stage_raw_delete(self, key: bytes, value: bytes):
-        self._op_stack.append_op(RevertableDelete(key, value))
+    def stash_raw_delete(self, key: bytes, value: bytes):
+        self._op_stack.stash_ops([RevertableDelete(key, value)])
 
     def estimate_num_keys(self, column_family: 'rocksdb.ColumnFamilyHandle' = None):
         return int(self._db.get_property(b'rocksdb.estimate-num-keys', column_family).decode())

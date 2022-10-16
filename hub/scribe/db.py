@@ -46,7 +46,7 @@ class PrimaryDB(SecondaryDB):
 
         if start_height <= 0:
             self.logger.info("loading all blockchain addresses, this will take a little while...")
-            hashXs = [hashX for hashX in hashX_iterator()]
+            hashXs = list({hashX for hashX in hashX_iterator()})
         else:
             self.logger.info("loading addresses since block %i...", start_height)
             hashXs = set()
@@ -68,11 +68,11 @@ class PrimaryDB(SecondaryDB):
             if existing_status and existing_status == status:
                 continue
             elif not existing_status:
-                prefix_db.stage_raw_put(key, status)
+                prefix_db.stash_raw_put(key, status)
                 op_cnt += 1
             else:
-                prefix_db.stage_raw_delete(key, existing_status)
-                prefix_db.stage_raw_put(key, status)
+                prefix_db.stash_raw_delete(key, existing_status)
+                prefix_db.stash_raw_put(key, status)
                 op_cnt += 2
             if op_cnt > 100000:
                 prefix_db.unsafe_commit()
@@ -93,8 +93,8 @@ class PrimaryDB(SecondaryDB):
     def apply_expiration_extension_fork(self):
         # TODO: this can't be reorged
         for k, v in self.prefix_db.claim_expiration.iterate():
-            self.prefix_db.claim_expiration.stage_delete(k, v)
-            self.prefix_db.claim_expiration.stage_put(
+            self.prefix_db.claim_expiration.stash_delete(k, v)
+            self.prefix_db.claim_expiration.stash_put(
                 (bisect_right(self.tx_counts, k.tx_num) + self.coin.nExtendedClaimExpirationTime,
                  k.tx_num, k.position), v
             )
@@ -104,8 +104,8 @@ class PrimaryDB(SecondaryDB):
         """Write (UTXO) state to the batch."""
         if self.db_height > 0:
             existing = self.prefix_db.db_state.get()
-            self.prefix_db.db_state.stage_delete((), existing.expanded)
-        self.prefix_db.db_state.stage_put((), (
+            self.prefix_db.db_state.stash_delete((), existing.expanded)
+        self.prefix_db.db_state.stash_put((), (
             self.genesis_bytes, self.db_height, self.db_tx_count, self.db_tip,
             self.utxo_flush_count, int(self.wall_time), self.catching_up, self._index_address_status, self.db_version,
             self.hist_flush_count, self.hist_comp_flush_count, self.hist_comp_cursor,
