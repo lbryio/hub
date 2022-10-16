@@ -127,6 +127,7 @@ class BlockchainProcessorService(BlockchainService):
         # {claim_hash: <change in effective amount>}
         self.effective_amount_delta = defaultdict(int)
         self.active_support_amount_delta = defaultdict(int)
+        self.future_effective_amount_delta = defaultdict(int)
 
         self.hashX_history_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_history', NAMESPACE)
         self.hashX_full_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_full', NAMESPACE)
@@ -405,6 +406,7 @@ class BlockchainProcessorService(BlockchainService):
         self.txo_to_claim[(tx_num, nout)] = pending
         self.claim_hash_to_txo[claim_hash] = (tx_num, nout)
         self.get_add_claim_utxo_ops(pending)
+        self.future_effective_amount_delta[claim_hash] += txo.value
 
     def get_add_claim_utxo_ops(self, pending: StagedClaimtrieItem):
         # claim tip by claim hash
@@ -500,6 +502,7 @@ class BlockchainProcessorService(BlockchainService):
         self.db.prefix_db.claim_to_support.stash_put((supported_claim_hash, tx_num, nout), (txo.value,))
         self.db.prefix_db.support_to_claim.stash_put((tx_num, nout), (supported_claim_hash,))
         self.pending_support_amount_change[supported_claim_hash] += txo.value
+        self.future_effective_amount_delta[supported_claim_hash] += txo.value
 
     def _add_claim_or_support(self, height: int, tx_hash: bytes, tx_num: int, nout: int, txo: 'TxOutput',
                               spent_claims: typing.Dict[bytes, Tuple[int, int, str]], first_input: 'TxInput'):
@@ -846,6 +849,18 @@ class BlockchainProcessorService(BlockchainService):
         if claim_info:
             return claim_info.normalized_name
 
+    def _get_future_effective_amounts(self, claim_hashes: List[bytes]):
+        return {
+            claim_hash: (0 if not v else v.future_effective_amount) + self.future_effective_amount_delta.get(
+                claim_hash, 0
+            )
+            for claim_hash, v in zip(
+                claim_hashes,
+                self.db.prefix_db.future_effective_amount.multi_get(
+                    [(claim_hash,) for claim_hash in claim_hashes]
+                )
+            )
+        }
     def _get_pending_supported_amount(self, claim_hash: bytes, height: Optional[int] = None) -> int:
         amount = self._cached_get_active_amount(claim_hash, ACTIVATED_SUPPORT_TXO_TYPE, height or (self.height + 1))
         if claim_hash in self.activated_support_amount_by_claim:
@@ -1450,6 +1465,26 @@ class BlockchainProcessorService(BlockchainService):
                 [((claim_hash,), (amount, support_sum)) for claim_hash, (amount, support_sum) in new_effective_amounts.items()]
             )
 
+        # update the future effective amount index
+        current_future_effective_amount_values = {
+            claim_hash: None if not v else v.future_effective_amount for claim_hash, v in zip(
+                self.future_effective_amount_delta,
+                self.db.prefix_db.future_effective_amount.multi_get(
+                    [(claim_hash,) for claim_hash in self.future_effective_amount_delta]
+                )
+            )
+        }
+        self.db.prefix_db.future_effective_amount.stash_multi_delete([
+            ((claim_hash,), (current_amount,))
+            for claim_hash, current_amount in current_future_effective_amount_values.items()
+            if current_amount is not None
+        ])
+
+        self.db.prefix_db.future_effective_amount.stash_multi_put([
+            ((claim_hash,), ((current_future_effective_amount_values[claim_hash] or 0) + delta,))
+            for claim_hash, delta in self.future_effective_amount_delta.items()
+        ])
+
         # update or insert channel counts
         for channel_hash, count in self.pending_channel_counts.items():
             if count != 0:
@@ -1785,6 +1820,7 @@ class BlockchainProcessorService(BlockchainService):
         self.reposted_count_delta.clear()
         self.effective_amount_delta.clear()
         self.active_support_amount_delta.clear()
+        self.future_effective_amount_delta.clear()
 
     def backup_block(self):
         assert len(self.db.prefix_db._op_stack) == 0
