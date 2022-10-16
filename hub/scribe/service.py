@@ -1322,10 +1322,10 @@ class BlockchainProcessorService(BlockchainService):
                                 self.effective_amount_delta[winning_claim_hash] += amount
                     self.taken_over_names.add(name)
                     if controlling:
-                        self.db.prefix_db.claim_takeover.stage_delete(
+                        self.db.prefix_db.claim_takeover.stash_delete(
                             (name,), (controlling.claim_hash, controlling.height)
                         )
-                    self.db.prefix_db.claim_takeover.stage_put((name,), (winning_claim_hash, height))
+                    self.db.prefix_db.claim_takeover.stash_put((name,), (winning_claim_hash, height))
                     if controlling and controlling.claim_hash not in self.abandoned_claims:
                         self.touched_claim_hashes.add(controlling.claim_hash)
                     self.touched_claim_hashes.add(winning_claim_hash)
