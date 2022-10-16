@@ -1314,6 +1314,14 @@ class BlockchainProcessorService(BlockchainService):
                                     ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num,
                                     position, previous_pending_activate.height, name, amount
                                 )
+                            pending_activated = self.db.prefix_db.activated.get_pending(
+                                ACTIVATED_CLAIM_TXO_TYPE, tx_num, position
+                            )
+                            if pending_activated:
+                                self.get_remove_activate_ops(
+                                    ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num, position,
+                                    pending_activated.height, name, amount
+                                )
                             self.get_activate_ops(
                                 ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num,
                                 position, height, name, amount
