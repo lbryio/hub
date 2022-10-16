@@ -505,11 +505,14 @@ class BlockchainProcessorService(BlockchainService):
         self.future_effective_amount_delta[supported_claim_hash] += txo.value
 
     def _add_claim_or_support(self, height: int, tx_hash: bytes, tx_num: int, nout: int, txo: 'TxOutput',
-                              spent_claims: typing.Dict[bytes, Tuple[int, int, str]], first_input: 'TxInput'):
+                              spent_claims: typing.Dict[bytes, Tuple[int, int, str]], first_input: 'TxInput') -> int:
         if txo.is_claim or txo.is_update:
             self._add_claim_or_update(height, txo, tx_hash, tx_num, nout, spent_claims, first_input)
+            return 1
         elif txo.is_support:
             self._add_support(height, txo, tx_num, nout)
+            return 2
+        return 0
 
     def _spend_claims_and_supports(self, txis: List[TxInput], spent_claims: Dict[bytes, Tuple[int, int, str]]):
         tx_nums = self.db.get_tx_nums(
