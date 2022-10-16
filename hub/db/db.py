@@ -40,7 +40,8 @@ class SecondaryDB:
                  cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
                  blocking_channel_ids: List[str] = None,
                  filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
-                 index_address_status=False, merkle_cache_size=32768, tx_cache_size=32768):
+                 index_address_status=False, merkle_cache_size=32768, tx_cache_size=32768,
+                 enforce_integrity=True):
         self.logger = logging.getLogger(__name__)
         self.coin = coin
         self._executor = executor
@@ -53,6 +54,7 @@ class SecondaryDB:
             assert max_open_files == -1, 'max open files must be -1 for secondary readers'
         self._db_max_open_files = max_open_files
         self._index_address_status = index_address_status
+        self._enforce_integrity = enforce_integrity
         self.prefix_db: typing.Optional[PrefixDB] = None
 
         self.hist_unflushed = defaultdict(partial(array.array, 'I'))
@@ -1016,7 +1018,7 @@ class SecondaryDB:
         self.prefix_db = PrefixDB(
             db_path, reorg_limit=self._reorg_limit, max_open_files=self._db_max_open_files,
             unsafe_prefixes={DBStatePrefixRow.prefix, MempoolTXPrefixRow.prefix, HashXMempoolStatusPrefixRow.prefix},
-            secondary_path=secondary_path
+            secondary_path=secondary_path, enforce_integrity=self._enforce_integrity
         )
 
         if secondary_path != '':

@@ -183,7 +183,8 @@ class BasePrefixDB:
     UNDO_KEY_STRUCT = struct.Struct(b'>Q32s')
     PARTIAL_UNDO_KEY_STRUCT = struct.Struct(b'>Q')
 
-    def __init__(self, path, max_open_files=64, secondary_path='', max_undo_depth: int = 200, unsafe_prefixes=None):
+    def __init__(self, path, max_open_files=64, secondary_path='', max_undo_depth: int = 200, unsafe_prefixes=None,
+                 enforce_integrity=True):
         column_family_options = {}
         for prefix in DB_PREFIXES:
             settings = COLUMN_SETTINGS[prefix.value]
@@ -206,7 +207,9 @@ class BasePrefixDB:
                 cf = self._db.get_column_family(prefix.value)
             self.column_families[prefix.value] = cf
 
-        self._op_stack = RevertableOpStack(self.get, self.multi_get, unsafe_prefixes=unsafe_prefixes)
+        self._op_stack = RevertableOpStack(
+            self.get, self.multi_get, unsafe_prefixes=unsafe_prefixes, enforce_integrity=enforce_integrity
+        )
         self._max_undo_depth = max_undo_depth
 
     def unsafe_commit(self):

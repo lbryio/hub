@@ -83,7 +83,8 @@ class OpStackIntegrity(Exception):
 
 class RevertableOpStack:
     def __init__(self, get_fn: Callable[[bytes], Optional[bytes]],
-                 multi_get_fn: Callable[[List[bytes]], Iterable[Optional[bytes]]], unsafe_prefixes=None):
+                 multi_get_fn: Callable[[List[bytes]], Iterable[Optional[bytes]]], unsafe_prefixes=None,
+                 enforce_integrity=True):
         """
         This represents a sequence of revertable puts and deletes to a key-value database that checks for integrity
         violations when applying the puts and deletes. The integrity checks assure that keys that do not exist
@@ -103,6 +104,7 @@ class RevertableOpStack:
         self._stash: Deque[RevertableOp] = deque()
         self._stashed_last_op_for_key = {}
         self._unsafe_prefixes = unsafe_prefixes or set()
+        self._enforce_integrity = enforce_integrity
 
     def stash_ops(self, ops: Iterable[RevertableOp]):
         self._stash.extend(ops)
@@ -129,6 +131,14 @@ class RevertableOpStack:
             else:
                 append_op_needed(op)
                 unique_keys.add(op.key)
+
+        existing = {}
+        if self._enforce_integrity and unique_keys:
+            unique_keys = list(unique_keys)
+            existing.update({
+                k: v for k, v in zip(unique_keys, self._multi_get(unique_keys))
+            })
+
         for op in ops_to_apply:
             if op.key in self._items and len(self._items[op.key]) and self._items[op.key][-1] == op.invert():
                 self._items[op.key].pop()
