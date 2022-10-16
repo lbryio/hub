@@ -1137,6 +1137,17 @@ class SecondaryDB:
             return self.tx_num_mapping[tx_hash]
         return self.prefix_db.tx_num.get(tx_hash).tx_num
 
+    def get_tx_nums(self, tx_hashes: List[bytes]) -> Dict[bytes, Optional[int]]:
+        if not tx_hashes:
+            return {}
+        if self._cache_all_tx_hashes:
+            return {tx_hash: self.tx_num_mapping[tx_hash] for tx_hash in tx_hashes}
+        return {
+            k: None if not v else v.tx_num for k, v in zip(
+                tx_hashes, self.prefix_db.tx_num.multi_get([(tx_hash,) for tx_hash in tx_hashes])
+            )
+        }
+
     def get_cached_claim_txo(self, claim_hash: bytes) -> Optional[ClaimToTXOValue]:
         if self._cache_all_claim_txos:
             return self.claim_to_txo.get(claim_hash)
