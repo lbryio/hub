@@ -1167,6 +1167,7 @@ class LBRYElectrumX(asyncio.Protocol):
             'protocol_max': max_str,
             'genesis_hash': env.coin.GENESIS_HASH,
             'description': env.description,
+            'channel_sponsor': env.channel_sponsor,
             'payment_address': env.payment_address,
             'donation_address': env.donation_address,
             'daily_fee': env.daily_fee,

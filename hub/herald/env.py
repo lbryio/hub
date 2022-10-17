@@ -8,7 +8,7 @@ class ServerEnv(Env):
                  daemon_url=None, host=None, elastic_host=None, elastic_port=None, es_index_prefix=None,
                  tcp_port=None, udp_port=None, banner_file=None, allow_lan_udp=None, country=None,
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
-                 session_timeout=None, drop_client=None, description=None, daily_fee=None,
+                 session_timeout=None, drop_client=None, description=None, channel_sponsor=None, daily_fee=None,
                  database_query_timeout=None, elastic_notifier_host=None, elastic_notifier_port=None,
                  blocking_channel_ids=None, filtering_channel_ids=None, peer_hubs=None, peer_announce=None,
                  index_address_status=None, address_history_cache_size=None, daemon_ca_path=None,
@@ -49,6 +49,7 @@ class ServerEnv(Env):
         self.session_timeout = session_timeout if session_timeout is not None else self.integer('SESSION_TIMEOUT', 600)
         self.drop_client = re.compile(drop_client) if drop_client is not None else self.custom("DROP_CLIENT", None, re.compile)
         self.description = description if description is not None else self.default('DESCRIPTION', '')
+        self.channel_sponsor = channel_sponsor if channel_sponsor is not None else self.default('CHANNEL_SPONSOR', '')
         self.daily_fee = daily_fee if daily_fee is not None else self.string_amount('DAILY_FEE', '0')
         self.database_query_timeout = (database_query_timeout / 1000.0) if database_query_timeout is not None else \
             (float(self.integer('QUERY_TIMEOUT_MS', 10000)) / 1000.0)
@@ -106,6 +107,7 @@ class ServerEnv(Env):
         parser.add_argument('--allow_lan_udp', action='store_true',
                             help="Reply to clients on the local network", default=cls.boolean('ALLOW_LAN_UDP', False))
         parser.add_argument('--description', default=cls.default('DESCRIPTION', None), type=str)
+        parser.add_argument('--channel_sponsor', default=cls.default('CHANNEL_SPONSOR', None), type=str)
         parser.add_argument('--banner_file', default=cls.default('BANNER_FILE', None), type=str)
         parser.add_argument('--country', default=cls.default('COUNTRY', 'US'), type=str)
         parser.add_argument('--payment_address', default=cls.default('PAYMENT_ADDRESS', None), type=str)
@@ -148,7 +150,7 @@ class ServerEnv(Env):
             allow_lan_udp=args.allow_lan_udp, cache_all_tx_hashes=args.cache_all_tx_hashes,
             cache_all_claim_txos=args.cache_all_claim_txos, country=args.country, payment_address=args.payment_address,
             donation_address=args.donation_address, max_send=args.max_send, max_receive=args.max_receive,
-            max_sessions=args.max_sessions, session_timeout=args.session_timeout,
+            max_sessions=args.max_sessions, session_timeout=args.session_timeout, channel_sponsor=args.channel_sponsor,
             drop_client=args.drop_client, description=args.description, daily_fee=args.daily_fee,
             database_query_timeout=args.query_timeout_ms, blocking_channel_ids=args.blocking_channel_ids,
             filtering_channel_ids=args.filtering_channel_ids, elastic_notifier_host=args.elastic_notifier_host,
