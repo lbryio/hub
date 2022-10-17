@@ -80,8 +80,6 @@ class BlockchainProcessorService(BlockchainService):
         # support txo: (supported claim hash, support amount)
         self.support_txo_to_claim: Dict[Tuple[int, int], Tuple[bytes, int, str]] = {}
         # removed supports {name: {claim_hash: [(tx_num, nout), ...]}}
-        self.removed_support_txos_by_name_by_claim: DefaultDict[str, DefaultDict[bytes, List[Tuple[int, int]]]] = \
-            defaultdict(lambda: defaultdict(list))
         self.abandoned_claims: Dict[bytes, StagedClaimtrieItem] = {}
         self.updated_claims: Set[bytes] = set()
         # removed activated support amounts by claim hash
@@ -128,6 +126,8 @@ class BlockchainProcessorService(BlockchainService):
         self.effective_amount_delta = defaultdict(int)
         self.active_support_amount_delta = defaultdict(int)
         self.future_effective_amount_delta = defaultdict(int)
+
+        self.spent_utxos = set()
 
         self.hashX_history_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_history', NAMESPACE)
         self.hashX_full_cache = LFUCacheWithMetrics(max(100, env.hashX_history_cache_size), 'hashX_full', NAMESPACE)
@@ -648,7 +648,7 @@ class BlockchainProcessorService(BlockchainService):
                         claim.channel_signature_is_valid, signing_hash, reposted_claim_hash
                     )
                     activation = activations[(txin_num, nout)]
-                    if 0 < activation <= self.height + 1:
+                    if 0 < activation <= self.height:
                         self.effective_amount_delta[claim_hash] -= spent.amount
                 self.future_effective_amount_delta[spent.claim_hash] -= spent.amount
                 if self.env.cache_all_claim_txos:
@@ -661,23 +661,19 @@ class BlockchainProcessorService(BlockchainService):
                 if spent.signing_hash and spent.channel_signature_is_valid and spent.signing_hash not in self.abandoned_claims:
                     self.pending_channel_counts[spent.signing_hash] -= 1
                 spent_claims[spent.claim_hash] = (spent.tx_num, spent.position, spent.normalized_name)
-                # print(f"\tspend lbry://{spent.name}#{spent.claim_hash.hex()}")
                 self.get_remove_claim_utxo_ops(spent)
+                # print(f"\tspent lbry://{spent.name}#{spent.claim_hash.hex()}")
             elif (txin_num, nout) in self.support_txo_to_claim or (txin_num, tx_hash, nout) in spent_supports:
                 activation = 0
                 if (txin_num, nout) in self.support_txo_to_claim:
                     spent_support, support_amount, supported_name = self.support_txo_to_claim.pop((txin_num, nout))
                     self.support_txos_by_claim[spent_support].remove((txin_num, nout))
-                    self.removed_support_txos_by_name_by_claim[supported_name][spent_support].append((txin_num, nout))
                 else:
                     spent_support = spent_supports[(txin_num, tx_hash, nout)]
                     support_amount = spent_support_amounts[(txin_num, nout)]
                     supported_name = self._get_pending_claim_name(spent_support)
-                    if supported_name is not None:
-                        self.removed_support_txos_by_name_by_claim[supported_name][spent_support].append(
-                            (txin_num, nout))
                     activation = activations[(txin_num, nout)]
-                    if 0 < activation <= self.height:  # TODO: fnord
+                    if 0 < activation <= self.height:
                         self.removed_active_support_amount_by_claim[spent_support].append(support_amount)
                         self.effective_amount_delta[spent_support] -= support_amount
                         self.active_support_amount_delta[spent_support] -= support_amount
@@ -686,11 +682,11 @@ class BlockchainProcessorService(BlockchainService):
                             ACTIVATED_SUPPORT_TXO_TYPE, spent_support, txin_num, nout, activation, supported_name,
                             support_amount
                         )
-                # print(f"\tspent support for {spent_support.hex()} activation:{activation} {support_amount} {tx_hash[::-1].hex()}:{nout}")
                 self.db.prefix_db.claim_to_support.stash_delete((spent_support, txin_num, nout), (support_amount,))
                 self.db.prefix_db.support_to_claim.stash_delete((txin_num, nout), (spent_support,))
                 self.pending_support_amount_change[spent_support] -= support_amount
                 self.future_effective_amount_delta[spent_support] -= support_amount
+                # print(f"\tspent support for {spent_support.hex()} activation:{activation} {support_amount} {tx_hash[::-1].hex()}:{nout}")
             else:
                 pass
         return spent_claim_count, spent_support_count
@@ -1068,13 +1064,10 @@ class BlockchainProcessorService(BlockchainService):
                 # there is no delay for claims to a name without a controlling value or to the controlling value
                 reactivate = True
             for activated_txo in activated_txos:
-                if activated_txo.is_support and (activated_txo.tx_num, activated_txo.position) in \
-                        self.removed_support_txos_by_name_by_claim[activated.normalized_name][activated.claim_hash]:
-                    # print("\tskip activate support for pending abandoned claim")
+                if (activated_txo.tx_num, activated_txo.position) in self.spent_utxos:
                     continue
+                txo_tup = (activated_txo.tx_num, activated_txo.position)
                 if activated_txo.is_claim:
-                    txo_type = ACTIVATED_CLAIM_TXO_TYPE
-                    txo_tup = (activated_txo.tx_num, activated_txo.position)
                     if txo_tup in self.txo_to_claim:
                         amount = self.txo_to_claim[txo_tup].amount
                     else:
@@ -1086,8 +1079,6 @@ class BlockchainProcessorService(BlockchainService):
                         continue
                     self.activated_claim_amount_by_name_and_hash[(activated.normalized_name, activated.claim_hash)] = amount
                 else:
-                    txo_type = ACTIVATED_SUPPORT_TXO_TYPE
-                    txo_tup = (activated_txo.tx_num, activated_txo.position)
                     if txo_tup in self.support_txo_to_claim:
                         amount = self.support_txo_to_claim[txo_tup][1]
                     else:
@@ -1866,7 +1857,6 @@ class BlockchainProcessorService(BlockchainService):
         self.claim_hash_to_txo.clear()
         self.support_txos_by_claim.clear()
         self.support_txo_to_claim.clear()
-        self.removed_support_txos_by_name_by_claim.clear()
         self.abandoned_claims.clear()
         self.removed_active_support_amount_by_claim.clear()
         self.activated_support_amount_by_claim.clear()
@@ -1900,6 +1890,7 @@ class BlockchainProcessorService(BlockchainService):
         self.effective_amount_delta.clear()
         self.active_support_amount_delta.clear()
         self.future_effective_amount_delta.clear()
+        self.spent_utxos.clear()
 
     def backup_block(self):
         assert len(self.db.prefix_db._op_stack) == 0
@@ -2000,6 +1991,7 @@ class BlockchainProcessorService(BlockchainService):
                 txin_num = self.pending_transaction_num_mapping[tx_hash]
             else:
                 txin_num = tx_nums[tx_hash]
+            self.spent_utxos.add((txin_num, nout))
             hashX, amount = self.utxo_cache.pop((tx_hash, nout), (None, None))
             txo_hashXs[(tx_hash, nout)] = (hashX, amount, txin_num)
             hashX_utxos_needed[(tx_hash[:4], txin_num, nout)] = tx_hash, nout
