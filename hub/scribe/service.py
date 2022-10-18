@@ -1057,8 +1057,6 @@ class BlockchainProcessorService(BlockchainService):
         # add the activation/delayed-activation ops
         for activated, activated_txos in activated_at_height.items():
             controlling = get_controlling(activated.normalized_name)
-            if activated.claim_hash in self.abandoned_claims:
-                continue
             reactivate = False
             if not controlling or controlling.claim_hash == activated.claim_hash:
                 # there is no delay for claims to a name without a controlling value or to the controlling value
