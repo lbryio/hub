@@ -82,6 +82,7 @@ class BlockchainProcessorService(BlockchainService):
         # removed supports {name: {claim_hash: [(tx_num, nout), ...]}}
         self.abandoned_claims: Dict[bytes, StagedClaimtrieItem] = {}
         self.updated_claims: Set[bytes] = set()
+        self.updated_claim_previous_activations: Dict[bytes, int] = {}
         # removed activated support amounts by claim hash
         self.removed_active_support_amount_by_claim: DefaultDict[bytes, List[int]] = defaultdict(list)
         # pending activated support amounts by claim hash
@@ -376,6 +377,7 @@ class BlockchainProcessorService(BlockchainService):
                 )
                 return
             (prev_tx_num, prev_idx, _) = spent_claims.pop(claim_hash)
+            activation = -1
             # print(f"\tupdate {claim_hash.hex()} {tx_hash[::-1].hex()} {txo.value}")
             if (prev_tx_num, prev_idx) in self.txo_to_claim:
                 previous_claim = self.txo_to_claim.pop((prev_tx_num, prev_idx))
@@ -392,6 +394,8 @@ class BlockchainProcessorService(BlockchainService):
                 )
             previous_amount = previous_claim.amount
             self.updated_claims.add(claim_hash)
+            if claim_hash not in self.updated_claim_previous_activations:
+                self.updated_claim_previous_activations[claim_hash] = activation
 
         if self.env.cache_all_claim_txos:
             self.db.claim_to_txo[claim_hash] = ClaimToTXOValue(
@@ -1019,11 +1023,10 @@ class BlockchainProcessorService(BlockchainService):
         # prepare to activate or delay activation of the pending claims being added this block
         for (tx_num, nout), staged in self.txo_to_claim.items():
             is_delayed = not staged.is_update
-            prev_txo = self.db.get_cached_claim_txo(staged.claim_hash)
-            if prev_txo:
-                prev_activation = self.db.get_activation(prev_txo.tx_num, prev_txo.position)
-                if height < prev_activation or prev_activation < 0:
-                    is_delayed = True
+            prev_activation = self.updated_claim_previous_activations.get(staged.claim_hash, -1)
+
+            if height <= prev_activation or prev_activation < 0:
+                is_delayed = True
             get_delayed_activate_ops(
                 staged.normalized_name, staged.claim_hash, is_delayed, tx_num, nout, staged.amount,
                 is_support=False
@@ -1876,6 +1879,7 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_reposted.clear()
         self.pending_channel_counts.clear()
         self.updated_claims.clear()
+        self.updated_claim_previous_activations.clear()
         self.taken_over_names.clear()
         self.pending_transaction_num_mapping.clear()
         self.pending_transactions.clear()
