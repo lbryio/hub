@@ -1092,7 +1092,7 @@ class BlockchainProcessorService(BlockchainService):
                     self.activated_support_amount_by_claim[activated.claim_hash].append(amount)
                     self.active_support_amount_delta[activated.claim_hash] += amount
                 self.effective_amount_delta[activated.claim_hash] += amount
-                activated_added_to_effective_amount.add(activated.claim_hash)
+                activated_added_to_effective_amount.add((activated_txo.tx_num, activated_txo.position))
                 self.activation_by_claim_by_name[activated.normalized_name][activated.claim_hash].append((activated_txo, amount))
                 # print(f"\tactivate {'support' if txo_type == ACTIVATED_SUPPORT_TXO_TYPE else 'claim'} "
                 #       f"{activated.claim_hash.hex()} @ {activated_txo.height}")
@@ -1324,7 +1324,7 @@ class BlockchainProcessorService(BlockchainService):
                                     ACTIVATED_CLAIM_TXO_TYPE, winning_claim_hash, tx_num,
                                     position, height, name, amount
                                 )
-                                if winning_claim_hash not in activated_added_to_effective_amount:
+                                if (tx_num, position) not in activated_added_to_effective_amount:
                                     self.effective_amount_delta[winning_claim_hash] += amount
                         self.taken_over_names.add(name)
                         if controlling:
