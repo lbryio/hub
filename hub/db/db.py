@@ -1321,7 +1321,8 @@ class SecondaryDB:
             for tx_hash_bytes, tx in zip(needed_mempool, await run_in_executor(
                     self._executor, self.prefix_db.mempool_tx.multi_get, [(tx_hash,) for tx_hash in needed_mempool],
                     True, False)):
-                self.tx_cache[tx_hash_bytes] = tx, None, None, -1
+                if tx is not None:
+                    self.tx_cache[tx_hash_bytes] = tx, None, None, -1
                 tx_infos[tx_hash_bytes[::-1].hex()] = None if not tx else tx.hex(), {'block_height': -1}
                 await asyncio.sleep(0)
         return {txid: tx_infos.get(txid) for txid in txids}  # match ordering of the txs in the request
