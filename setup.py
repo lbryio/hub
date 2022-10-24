@@ -33,7 +33,7 @@ setup(
         'certifi>=2021.10.08',
         'colorama==0.3.7',
         'cffi==1.13.2',
-        'protobuf==3.18.3',
+        'protobuf==3.20.1',
         'msgpack==0.6.1',
         'prometheus_client==0.7.1',
         'coincurve==15.0.0',
