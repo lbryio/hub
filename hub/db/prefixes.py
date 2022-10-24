@@ -1799,6 +1799,7 @@ class EffectiveAmountPrefixRow(PrefixRow):
 
     @classmethod
     def pack_value(cls, effective_amount: int, support_sum: int) -> bytes:
+        assert effective_amount >= support_sum
         return super().pack_value(effective_amount, support_sum)
 
     @classmethod
