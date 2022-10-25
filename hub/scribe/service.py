@@ -230,11 +230,8 @@ class BlockchainProcessorService(BlockchainService):
                         self.advance_block, block
                     )
                     txs_added = self.tx_count - start_count
-                    self.log.info(
-                        "advanced to %i, %i(+%i) txs, -%i/+%i utxos, -%i/+%i claims (%i/%i abandoned), -%i/+%i supports in %0.3fs", self.height,
-                        self.tx_count, txs_added, txi_count, txo_count, c_spent, c_added, abandoned, abandoned_chan, s_spent, s_added,
-                        time.perf_counter() - start
-                    )
+                    msg = f"advanced to {self.height:<5.0f} (took {(time.perf_counter() - start):0.3f}s) | +{txs_added:<4.0f} txs (total txs: {self.tx_count:<9.0f}) | {txi_count:->4.0f}/{txo_count:+>4.0f} utxos | {c_spent:->4.0f}/{c_added:+>4.0f} claims | {s_spent:->4.0f}/{s_added:+>4.0f} supports | abandoned: {abandoned:<4.0f} / {abandoned_chan:>4.0f}"
+                    self.log.warning(msg)
                     if self.height == self.coin.nExtendedClaimExpirationForkHeight:
                         self.log.warning(
                             "applying extended claim expiration fork on claims accepted by, %i", self.height
