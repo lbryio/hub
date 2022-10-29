@@ -250,7 +250,7 @@ class ElasticSyncService(BlockchainReaderService):
                                                                                     apply_blocking=False,
                                                                                     apply_filtering=False):
                 if not claim:
-                    self.log.warning("wat")
+                    self.log.warning("cannot sync claim %s", (claim_hash or b'').hex())
                     continue
                 claims[claim_hash] = claim
                 total_extras[claim_hash] = claim

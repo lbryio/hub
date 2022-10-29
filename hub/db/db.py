@@ -790,7 +790,7 @@ class SecondaryDB:
         for touched in claim_hashes:
             extra = {}
             claim_txo = claims[touched]
-            if not claim_txo:
+            if not claim_txo or (claim_txo and not controlling_claims[claim_txo.normalized_name]):
                 yield touched, None, extra
                 continue
             if touched in total_extra:
