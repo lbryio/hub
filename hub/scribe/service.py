@@ -2018,11 +2018,11 @@ class BlockchainProcessorService(BlockchainService):
         }
         for (tx_hash, nout), (hashX, amount, txin_num) in txo_hashXs.items():
             if not hashX:
-                hashX_value = hashX_utxos.get((tx_hash[:4], txin_num, nout))
+                hashX_value = hashX_utxos.get((tx_hash, nout))
                 if not hashX_value:
                     continue
                 hashX = hashX_value.hashX
-                utxo_value = utxos.get((hashX, txin_num, nout))
+                utxo_value = utxos.get((tx_hash, nout))
                 if not utxo_value:
                     self.log.warning(
                         "%s:%s is not found in UTXO db for %s", hash_to_hex_str(tx_hash), nout, hash_to_hex_str(hashX)
