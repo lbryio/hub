@@ -1,3 +1,4 @@
+import hashlib
 import asyncio
 import array
 import time
@@ -38,10 +39,12 @@ class PrimaryDB(SecondaryDB):
             tx_counts = self.tx_counts
             hist_tx_nums = array.array('I')
             hist_tx_nums.frombytes(history)
-            hist = ''
-            for tx_num in hist_tx_nums:
-                hist += f'{self.get_tx_hash(tx_num)[::-1].hex()}:{bisect_right(tx_counts, tx_num)}:'
-            return sha256(hist.encode())
+            digest = hashlib.sha256()
+            for tx_num, tx_hash in zip(
+                    hist_tx_nums,
+                    self.prefix_db.tx_hash.multi_get([(tx_num,) for tx_num in hist_tx_nums], deserialize_value=False)):
+                digest.update(f'{tx_hash[::-1].hex()}:{bisect_right(tx_counts, tx_num)}:'.encode())
+            return digest.digest()
 
         start = time.perf_counter()
 
