@@ -35,14 +35,12 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe-elastic-sync
-      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
-      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
+      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8 d4612c256a44fc025c37a875751415299b1f8220
+      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6 145265bd234b7c9c28dfc6857d878cca402dda94 22335fbb132eee86d374b613875bf88bec83492f f665b89b999f411aa5def311bb2eb385778d49c8
     command:  # for full options, see `scribe-elastic-sync --help`
       - "--max_query_workers=2"
       - "--elastic_host=127.0.0.1"            # elasticsearch host
       - "--elastic_port=9200"                 # elasticsearch port
-      - "--elastic_notifier_host=127.0.0.1"   # address for the elastic sync notifier to connect to
-      - "--elastic_notifier_port=19080"
   herald:
     depends_on:
       - lbcd
@@ -58,18 +56,15 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=herald
-      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8
-      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6
+      - FILTERING_CHANNEL_IDS=770bd7ecba84fd2f7607fb15aedd2b172c2e153f 95e5db68a3101df19763f3a5182e4b12ba393ee8 d4612c256a44fc025c37a875751415299b1f8220
+      - BLOCKING_CHANNEL_IDS=dd687b357950f6f271999971f43c785e8067c3a9 06871aa438032244202840ec59a469b303257cad b4a2528f436eca1bf3bf3e10ff3f98c57bd6c4c6 145265bd234b7c9c28dfc6857d878cca402dda94 22335fbb132eee86d374b613875bf88bec83492f f665b89b999f411aa5def311bb2eb385778d49c8
     command:  # for full options, see `herald --help`
       - "--index_address_statuses"
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=4"
       - "--host=0.0.0.0"
+      - "--elastic_services=127.0.0.1:9200/127.0.0.1:19080"
       - "--prometheus_port=2112"              # comment out to disable prometheus metrics
-      # - "--elastic_host=127.0.0.1"            # elasticsearch host
-      # - "--elastic_port=9200"                 # elasticsearch port
-      # - "--elastic_notifier_host=127.0.0.1"   # address for the elastic sync notifier to connect to
-      # - "--elastic_notifier_port=19080"
       # - "--max_sessions=100000              # uncomment to increase the maximum number of electrum connections, defaults to 1000
       # - "--allow_lan_udp"                   # uncomment to reply to clients on the local network
   es01:
