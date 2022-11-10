@@ -14,11 +14,10 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe
-      - SNAPSHOT_URL=https://snapshots.lbry.com/hub/lbry-rocksdb.zip
+      - SNAPSHOT_URL=https://snapshots.lbry.com/hub/block_1256013/lbry-rocksdb.tar
     command:
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=2"
-      - "--cache_all_tx_hashes"
   scribe_elastic_sync:
     image: lbry/hub:${SCRIBE_TAG:-master}
     restart: always

@@ -8,16 +8,8 @@ SNAPSHOT_URL="${SNAPSHOT_URL:-}" #off by default. latest snapshot at https://lbr
 
 if [[ "$HUB_COMMAND" == "scribe" ]] && [[ -n "$SNAPSHOT_URL" ]] && [[ ! -d /database/lbry-rocksdb ]]; then
   files="$(ls)"
-  echo "Downloading hub snapshot from $SNAPSHOT_URL"
-  wget --no-verbose --trust-server-names --content-disposition "$SNAPSHOT_URL"
-  echo "Extracting snapshot..."
-  filename="$(grep -vf <(echo "$files") <(ls))" # finds the file that was not there before
-  case "$filename" in
-    *.tgz|*.tar.gz|*.tar.bz2 )  tar xvf "$filename" --directory /database ;;
-    *.zip ) unzip "$filename" -d /database/ ;;
-    * ) echo "Don't know how to extract ${filename}. SNAPSHOT COULD NOT BE LOADED" && exit 1 ;;
-  esac
-  rm "$filename"
+  echo "Downloading and extracting hub snapshot from $SNAPSHOT_URL"
+  wget --no-verbose -c "$SNAPSHOT_URL" -O - | tar x -C /database
 fi
 
 if [ -z "$HUB_COMMAND" ]; then
