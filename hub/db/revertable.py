@@ -135,9 +135,11 @@ class RevertableOpStack:
         existing = {}
         if self._enforce_integrity and unique_keys:
             unique_keys = list(unique_keys)
-            existing.update({
-                k: v for k, v in zip(unique_keys, self._multi_get(unique_keys))
-            })
+            for idx in range(0, len(unique_keys), 10000):
+                batch = unique_keys[idx:idx+10000]
+                existing.update({
+                    k: v for k, v in zip(batch, self._multi_get(batch))
+                })
 
         for op in ops_to_apply:
             if op.key in self._items and len(self._items[op.key]) and self._items[op.key][-1] == op.invert():
