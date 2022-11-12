@@ -509,15 +509,53 @@ class BlockchainProcessorService(BlockchainService):
         self.pending_support_amount_change[supported_claim_hash] += txo.value
         self.future_effective_amount_delta[supported_claim_hash] += txo.value
 
-    def _add_claim_or_support(self, height: int, tx_hash: bytes, tx_num: int, nout: int, txo: 'TxOutput',
-                              spent_claims: typing.Dict[bytes, Tuple[int, int, str]], first_input: 'TxInput') -> int:
-        if txo.is_claim or txo.is_update:
-            self._add_claim_or_update(height, txo, tx_hash, tx_num, nout, spent_claims, first_input)
-            return 1
-        elif txo.is_support:
-            self._add_support(height, txo, tx_num, nout)
-            return 2
-        return 0
+    def add_txos(self, height: int, tx_hash: bytes, tx_num: int, txos: List[TxOutput],
+                 spent_claims: typing.Dict[bytes, Tuple[int, int, str]], first_input: 'TxInput') -> Tuple[int, int]:
+        claim_cnt = 0
+        support_cnt = 0
+        supported_claim_hashes = set()
+        for nout, txo in enumerate(txos):
+            # Get the hashX.  Ignore unspendable outputs
+            hashX = self.add_utxo(tx_hash, tx_num, nout, txo)
+            if hashX:
+                # self._set_hashX_cache(hashX)
+                if tx_num not in self.hashXs_by_tx[hashX]:
+                    self.hashXs_by_tx[hashX].append(tx_num)
+
+            if txo.is_support:
+                supported_claim_hashes.add(txo.support.claim_hash[::-1])
+        supported_claim_hashes = list(supported_claim_hashes)
+        supported_claims = {
+            claim_hash: txo for claim_hash, txo in zip(
+                supported_claim_hashes, self.db.prefix_db.claim_to_txo.multi_get(
+                    [(claim_hash,) for claim_hash in supported_claim_hashes]
+                )
+            )
+        }
+        for nout, txo in enumerate(txos):
+            if txo.is_claim or txo.is_update:
+                self._add_claim_or_update(height, txo, tx_hash, tx_num, nout, spent_claims, first_input)
+                claim_cnt += 1
+            elif txo.is_support:
+                supported_claim_hash = txo.support.claim_hash[::-1]
+                try:
+                    normalized_name = normalize_name(txo.support.name.decode())
+                except UnicodeDecodeError:
+                    normalized_name = ''.join(chr(x) for x in txo.support.name)
+                supported_claim = supported_claims[supported_claim_hash]
+                if supported_claim and supported_claim.normalized_name != normalized_name:
+                    continue
+                self.support_txos_by_claim[supported_claim_hash].append((tx_num, nout))
+                self.support_txo_to_claim[(tx_num, nout)] = supported_claim_hash, txo.value, normalized_name
+                # print(f"\tsupport claim {supported_claim_hash.hex()} +{txo.value}")
+                self.db.prefix_db.claim_to_support.stash_put((supported_claim_hash, tx_num, nout), (txo.value,))
+                self.db.prefix_db.support_to_claim.stash_put((tx_num, nout), (supported_claim_hash,))
+                self.pending_support_amount_change[supported_claim_hash] += txo.value
+                self.future_effective_amount_delta[supported_claim_hash] += txo.value
+                support_cnt += 1
+            else:
+                pass
+        return claim_cnt, support_cnt
 
     def _spend_claims_and_supports(self, txis: List[TxInput], spent_claims: Dict[bytes, Tuple[int, int, str]]):
         tx_nums = self.db.get_tx_nums(
@@ -1622,8 +1660,8 @@ class BlockchainProcessorService(BlockchainService):
         # Use local vars for speed in the loops
         tx_count = self.tx_count
         spend_utxos = self.spend_utxos
-        add_utxo = self.add_utxo
-        add_claim_or_support = self._add_claim_or_support
+        add_txos = self.add_txos
+
         # spend_claim_or_support = self._spend_claim_or_support_txo
         txs: List[Tuple[Tx, bytes]] = block.transactions
 
@@ -1659,21 +1697,11 @@ class BlockchainProcessorService(BlockchainService):
 
             # Add the new UTXOs
             txo_count += len(tx.outputs)
-            for nout, txout in enumerate(tx.outputs):
-                # Get the hashX.  Ignore unspendable outputs
-                hashX = add_utxo(tx_hash, tx_count, nout, txout)
-                if hashX:
-                    # self._set_hashX_cache(hashX)
-                    if tx_count not in self.hashXs_by_tx[hashX]:
-                        self.hashXs_by_tx[hashX].append(tx_count)
-                # add claim/support txo
-                added_claim_or_support = add_claim_or_support(
-                    height, tx_hash, tx_count, nout, txout, spent_claims, tx.inputs[0]
-                )
-                if added_claim_or_support == 1:
-                    claim_added_count += 1
-                elif added_claim_or_support == 2:
-                    support_added_count += 1
+            added_claims, added_supports = add_txos(
+                height, tx_hash, tx_count, tx.outputs, spent_claims, tx.inputs[0]
+            )
+            claim_added_count += added_claims
+            support_added_count += added_supports
 
             # Handle abandoned claims
             abandoned_channels = {}
