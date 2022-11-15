@@ -191,7 +191,6 @@ class ElasticSyncService(BlockchainReaderService):
                         await self.sync_client.update_by_query(
                             self.index, body=self.update_filter_query(censor_type, only_channels(batch), True),
                             slices=4)
-                    await self.sync_client.indices.refresh(self.index)
 
         if filtered_streams:
             await batched_update_filter(filtered_streams, False, Censor.SEARCH)
@@ -201,6 +200,8 @@ class ElasticSyncService(BlockchainReaderService):
             await batched_update_filter(blocked_streams, False, Censor.RESOLVE)
         if blocked_channels:
             await batched_update_filter(blocked_channels, True, Censor.RESOLVE)
+        if filtered_streams or filtered_channels or blocked_streams or blocked_channels:
+            await self.sync_client.indices.refresh(self.index)
 
     @staticmethod
     def _upsert_claim_query(index, claim):
