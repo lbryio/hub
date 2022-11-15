@@ -134,6 +134,8 @@ class ElasticSyncService(BlockchainReaderService):
         index_version = await self.get_index_version()
 
         res = await self.sync_client.indices.create(self.index, INDEX_DEFAULT_SETTINGS, ignore=400)
+        if 'error' in res:
+            self.log.warning("es index create failed: %s", res)
         acked = res.get('acknowledged', False)
 
         if acked:
@@ -202,13 +204,13 @@ class ElasticSyncService(BlockchainReaderService):
 
     @staticmethod
     def _upsert_claim_query(index, claim):
-        return {
-            'doc': {key: value for key, value in claim.items() if key in ALL_FIELDS},
+        doc = {key: value for key, value in claim.items() if key in ALL_FIELDS}
+        doc.update({
             '_id': claim['claim_id'],
             '_index': index,
-            '_op_type': 'update',
-            'doc_as_upsert': True
-        }
+            '_op_type': 'index',
+        })
+        return doc
 
     @staticmethod
     def _delete_claim_query(index, claim_hash: bytes):

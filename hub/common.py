@@ -764,7 +764,8 @@ INDEX_DEFAULT_SETTINGS = {
             "claim_type": {"type": "byte"},
             "censor_type": {"type": "byte"},
             "trending_score": {"type": "double"},
-            "release_time": {"type": "long"}
+            "release_time": {"type": "long"},
+            "extensions": {"type": "object"},
         }
     }
 }
@@ -788,7 +789,7 @@ FIELDS = {
     'reposted_claim_id', 'repost_count', 'sd_hash',
     'trending_score', 'tx_num',
     'channel_tx_id', 'channel_tx_position', 'channel_height',  'reposted_tx_id',
-    'reposted_tx_position', 'reposted_height',
+    'reposted_tx_position', 'reposted_height', 'extensions',
 }
 
 TEXT_FIELDS = {
@@ -807,7 +808,11 @@ RANGE_FIELDS = {
     'channel_tx_position', 'channel_height',
 }
 
-ALL_FIELDS = RANGE_FIELDS | TEXT_FIELDS | FIELDS
+OBJECT_FIELDS = {
+    'extensions',
+}
+
+ALL_FIELDS = OBJECT_FIELDS | RANGE_FIELDS | TEXT_FIELDS | FIELDS
 
 REPLACEMENTS = {
     'claim_name': 'normalized_name',
@@ -826,6 +831,7 @@ REPLACEMENTS = {
 
 
 def expand_query(**kwargs):
+    #print(f'expand_query: >>> {kwargs}')
     if "amount_order" in kwargs:
         kwargs["limit"] = 1
         kwargs["order_by"] = "effective_amount"
@@ -849,6 +855,7 @@ def expand_query(**kwargs):
         if value is None or isinstance(value, list) and len(value) == 0:
             continue
         key = REPLACEMENTS.get(key, key)
+        #print(f'expand_query: *** {key} = {value}')
         if key in FIELDS:
             partial_id = False
             if key == 'claim_type':
@@ -911,6 +918,26 @@ def expand_query(**kwargs):
                             ]}
                         }
                     )
+            elif key in OBJECT_FIELDS:
+                def flatten(field, d):
+                    if isinstance(d, dict) and len(d) > 0:
+                        for k, v in d.items():
+                            subfield = f'{field}.{k}' if field else k
+                            yield from flatten(subfield, v)
+                    elif isinstance(d, dict):
+                        # require <field> be present
+                        yield {"exists": {"field": field}}
+                    elif isinstance(d, list):
+                        # require <field> match all values <d>
+                        yield {"bool": {"must": [{"match": {field: {"query": e}}} for e in d]}}
+                    else:
+                        # require <field> match value <d>
+                        yield {"match": {field: {"query": d}}}
+                        #yield {"term": {field: {"value": d}}}
+                query['must'].append(
+                    {"exists": {"field": key}},
+                )
+                query['must'].extend(flatten(key, value))
             elif many:
                 query['must'].append({"terms": {key: value}})
             else:
@@ -1022,6 +1049,7 @@ def expand_query(**kwargs):
                 "sort": query["sort"]
             }
         }
+    #print(f'expand_query: <<< {query}')
     return query
 
 

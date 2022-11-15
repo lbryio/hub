@@ -1,6 +1,6 @@
 from typing import Optional, Set, Dict, List
 from concurrent.futures.thread import ThreadPoolExecutor
-from hub.schema.claim import guess_stream_type
+from hub.schema.claim import guess_stream_type, Claim
 from hub.schema.result import Censor
 from hub.common import hash160, STREAM_TYPES, CLAIM_TYPES, LRUCache
 from hub.db import SecondaryDB
@@ -43,9 +43,11 @@ class ElasticSyncDB(SecondaryDB):
         metadatas.update(await self.get_claim_metadatas(list(needed_txos)))
 
         for claim_hash, claim in claims.items():
+            assert isinstance(claim, ResolveResult)
             metadata = metadatas.get((claim.tx_hash, claim.position))
             if not metadata:
                 continue
+            assert isinstance(metadata, Claim)
             if not metadata.is_stream or not metadata.stream.has_fee:
                 fee_amount = 0
             else:
@@ -98,16 +100,24 @@ class ElasticSyncDB(SecondaryDB):
                 if reposted_metadata.is_stream and \
                         (reposted_metadata.stream.video.duration or reposted_metadata.stream.audio.duration):
                     reposted_duration = reposted_metadata.stream.video.duration or reposted_metadata.stream.audio.duration
+
+            extensions = None
             if metadata.is_stream:
                 meta = metadata.stream
+                extensions = meta.extensions.to_dict()
             elif metadata.is_channel:
                 meta = metadata.channel
             elif metadata.is_collection:
                 meta = metadata.collection
             elif metadata.is_repost:
                 meta = metadata.repost
+                modified = meta.reference.apply(reposted_metadata)
+                modified = getattr(modified, modified.claim_type)
+                if hasattr(modified, 'extensions'):
+                    extensions = modified.extensions.to_dict()
             else:
                 continue
+
             claim_tags = [tag for tag in meta.tags]
             claim_languages = [lang.language or 'none' for lang in meta.languages] or ['none']
             tags = list(set(claim_tags).union(set(reposted_tags)))
@@ -181,6 +191,7 @@ class ElasticSyncDB(SecondaryDB):
                 'channel_tx_id': None if not claim.channel_tx_hash else claim.channel_tx_hash[::-1].hex(),
                 'channel_tx_position': claim.channel_tx_position,
                 'channel_height': claim.channel_height,
+                'extensions': extensions
             }
 
             if metadata.is_repost and reposted_duration is not None:
