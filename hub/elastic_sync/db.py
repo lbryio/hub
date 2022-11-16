@@ -191,7 +191,8 @@ class ElasticSyncDB(SecondaryDB):
                 'channel_tx_id': None if not claim.channel_tx_hash else claim.channel_tx_hash[::-1].hex(),
                 'channel_tx_position': claim.channel_tx_position,
                 'channel_height': claim.channel_height,
-                'extensions': extensions
+                'extensions': list(extensions.keys()) if extensions else None,
+                'extensions_obj': extensions,
             }
 
             if metadata.is_repost and reposted_duration is not None:

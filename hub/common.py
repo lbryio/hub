@@ -765,7 +765,15 @@ INDEX_DEFAULT_SETTINGS = {
             "censor_type": {"type": "byte"},
             "trending_score": {"type": "double"},
             "release_time": {"type": "long"},
-            "extensions": {"type": "object"},
+            # top-level keys of extensions dict indexed as keywords
+            "extensions": {
+                "type": "keyword"
+            },
+            # full contents of extensions dict available as "runtime" fields
+            "extensions_obj": {
+                "type": "object",
+                "dynamic": "runtime"
+            },
         }
     }
 }
@@ -789,7 +797,7 @@ FIELDS = {
     'reposted_claim_id', 'repost_count', 'sd_hash',
     'trending_score', 'tx_num',
     'channel_tx_id', 'channel_tx_position', 'channel_height',  'reposted_tx_id',
-    'reposted_tx_position', 'reposted_height', 'extensions',
+    'reposted_tx_position', 'reposted_height', 'extensions', 'extensions_obj'
 }
 
 TEXT_FIELDS = {
@@ -853,6 +861,8 @@ def expand_query(**kwargs):
             key = key.replace('__in', '')
             value = list(filter(None, value))
         if value is None or isinstance(value, list) and len(value) == 0:
+            continue
+        if key in OBJECT_FIELDS and not isinstance(value, dict):
             continue
         key = REPLACEMENTS.get(key, key)
         #print(f'expand_query: *** {key} = {value}')
@@ -934,10 +944,10 @@ def expand_query(**kwargs):
                         # require <field> match value <d>
                         yield {"match": {field: {"query": d}}}
                         #yield {"term": {field: {"value": d}}}
-                query['must'].append(
-                    {"exists": {"field": key}},
-                )
-                query['must'].extend(flatten(key, value))
+                # query field <key> for list of top-level dictionary keys
+                query['must'].append({"terms": {key: list(value.keys())}})
+                # query field <key>_obj for nested properties
+                query['must'].extend(flatten(f'{key}_obj', value))
             elif many:
                 query['must'].append({"terms": {key: value}})
             else:
