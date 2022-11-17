@@ -943,7 +943,6 @@ def expand_query(**kwargs):
                     else:
                         # require <field> match value <d>
                         yield {"match": {field: {"query": d}}}
-                        #yield {"term": {field: {"value": d}}}
                 # query field <key> for list of top-level dictionary keys
                 query['must'].append({"terms": {key: list(value.keys())}})
                 # query field <key>_obj for nested properties
