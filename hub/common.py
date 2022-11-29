@@ -797,7 +797,7 @@ FIELDS = {
     'reposted_claim_id', 'repost_count', 'sd_hash',
     'trending_score', 'tx_num',
     'channel_tx_id', 'channel_tx_position', 'channel_height',  'reposted_tx_id',
-    'reposted_tx_position', 'reposted_height', 'extensions', 'extensions_obj'
+    'reposted_tx_position', 'reposted_height', 'extensions',
 }
 
 TEXT_FIELDS = {
@@ -820,7 +820,8 @@ OBJECT_FIELDS = {
     'extensions',
 }
 
-ALL_FIELDS = OBJECT_FIELDS | RANGE_FIELDS | TEXT_FIELDS | FIELDS
+ALL_FIELDS = (RANGE_FIELDS | TEXT_FIELDS | FIELDS |
+    OBJECT_FIELDS | { f+'_obj' for f in OBJECT_FIELDS })
 
 REPLACEMENTS = {
     'claim_name': 'normalized_name',

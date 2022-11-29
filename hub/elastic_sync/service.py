@@ -205,13 +205,13 @@ class ElasticSyncService(BlockchainReaderService):
 
     @staticmethod
     def _upsert_claim_query(index, claim):
-        doc = {key: value for key, value in claim.items() if key in ALL_FIELDS}
-        doc.update({
+        return {
+            'doc': {key: value for key, value in claim.items() if key in ALL_FIELDS},
             '_id': claim['claim_id'],
             '_index': index,
-            '_op_type': 'index',
-        })
-        return doc
+            '_op_type': 'update',
+            'doc_as_upsert': True
+        }
 
     @staticmethod
     def _delete_claim_query(index, claim_hash: bytes):
