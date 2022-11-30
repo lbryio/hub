@@ -3,8 +3,8 @@ from typing import List, TYPE_CHECKING, Union, Optional, Dict, Set, Tuple
 from itertools import chain
 
 from hub.error import ResolveCensoredError
-from hub.schema.types.v2.result_pb2 import Outputs as OutputsMessage
-from hub.schema.types.v2.result_pb2 import Error as ErrorMessage
+from lbry_types.v2.result_pb2 import Outputs as OutputsMessage
+from lbry_types.v2.result_pb2 import Error as ErrorMessage
 if TYPE_CHECKING:
     from hub.db.common import ResolveResult
 INVALID = ErrorMessage.Code.Name(ErrorMessage.INVALID)

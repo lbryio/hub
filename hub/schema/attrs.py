@@ -16,13 +16,13 @@ from hub.schema.mime_types import guess_media_type
 from hub.schema.base import Metadata, BaseMessageList
 from hub.schema.tags import normalize_tag
 from google.protobuf.message import Message as ProtobufMessage
-from lbry.schema.types.v2.claim_pb2 import (
+from lbry_types.v2.claim_pb2 import (
     Claim as ClaimMessage,
     Fee as FeeMessage,
     Location as LocationMessage,
     Language as LanguageMessage,
 )
-from lbry.schema.types.v2.extension_pb2 import Extension as ExtensionMessage
+from lbry_types.v2.extension_pb2 import Extension as ExtensionMessage
 
 log = logging.getLogger(__name__)
 

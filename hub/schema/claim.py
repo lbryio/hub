@@ -19,7 +19,7 @@ from hub.schema.attrs import (
     LanguageList, LocationList, ClaimList, ModifyingClaimReference, TagList,
     StreamExtensionMap
 )
-from hub.schema.types.v2.claim_pb2 import Claim as ClaimMessage
+from lbry_types.v2.claim_pb2 import Claim as ClaimMessage
 from hub.error import InputValueIsNoneError
 
 
