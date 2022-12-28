@@ -590,6 +590,20 @@ def is_valid_public_ipv4(address, allow_localhost: bool = False, allow_lan: bool
     except (ipaddress.AddressValueError, ValueError):
         return False
 
+def is_valid_public_ipv6(address, allow_localhost: bool = False, allow_lan: bool = False):
+    try:
+        parsed_ip = ipaddress.ip_address(address)
+        if parsed_ip.is_loopback and allow_localhost:
+            return True
+        if allow_lan and parsed_ip.is_private:
+            return True
+        return not any((parsed_ip.version != 6, parsed_ip.is_unspecified, parsed_ip.is_link_local, parsed_ip.is_loopback,
+                        parsed_ip.is_multicast, parsed_ip.is_reserved, parsed_ip.is_private))
+    except (ipaddress.AddressValueError, ValueError):
+        return False
+
+def is_valid_public_ip(address, **kwargs):
+    return is_valid_public_ipv6(address, **kwargs) or is_valid_public_ipv4(address, **kwargs)
 
 def sha256(x):
     """Simple wrapper of hashlib sha256."""

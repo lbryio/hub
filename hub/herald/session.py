@@ -271,7 +271,8 @@ class SessionManager:
                                   f'{host}:{port:d} : {e!r}')
             raise
         else:
-            self.logger.info(f'{kind} server listening on {host}:{port:d}')
+            for s in self.servers[kind].sockets:
+                self.logger.info(f'{kind} server listening on {s.getsockname()[:2]}')
 
     async def _start_external_servers(self):
         """Start listening on TCP and SSL ports, but only if the respective
