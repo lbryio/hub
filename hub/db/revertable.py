@@ -160,7 +160,7 @@ class RevertableOpStack:
                         # there is a value and we're not deleting it in this op
                         # check that a delete for the stored value is in the stack
                         raise OpStackIntegrity(f"db op tries to delete with incorrect existing value {op}\nvs\n{stored_val}")
-                    elif not stored_val:
+                    elif not has_stored_val:
                         raise OpStackIntegrity(f"db op tries to delete nonexistent key: {op}")
                     elif stored_val != op.value:
                         raise OpStackIntegrity(f"db op tries to delete with incorrect value: {op}")
