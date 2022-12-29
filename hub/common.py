@@ -1063,6 +1063,9 @@ async def asyncify_for_loop(gen, ticks_per_sleep: int = 1000):
             await async_sleep(0)
 
 
+_SHA256_DIGEST_STATE_SIZE = 120
+
+
 class ResumableSHA256:
     __slots__ = ['_hasher']
 
@@ -1071,6 +1074,8 @@ class ResumableSHA256:
         if state is not None:
             ctx = self._get_evp_md_ctx()
             ctx_size = ctx.digest.contents.ctx_size
+            if len(state) != _SHA256_DIGEST_STATE_SIZE != ctx_size:
+                raise Exception(f'invalid sha256 digester state, got {len(state)} bytes')
             memmove(ctx.md_data, state, ctx_size)
 
     def _get_evp_md_ctx(self):
@@ -1086,7 +1091,7 @@ class ResumableSHA256:
         hasher_state = ctx.md_data[:ctx_size]
         return hasher_state
 
-    def copy(self):
+    def __copy__(self):
         return ResumableSHA256(self.get_state())
 
     def update(self, data: bytes):
@@ -1094,6 +1099,3 @@ class ResumableSHA256:
 
     def digest(self):
         return self._hasher.digest()
-
-    def hexdigest(self):
-        return self.digest().hex()
