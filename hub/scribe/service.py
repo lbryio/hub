@@ -1,3 +1,4 @@
+import rehash
 import time
 import asyncio
 import typing
@@ -11,7 +12,8 @@ from hub import PROMETHEUS_NAMESPACE
 from hub.db.prefixes import ACTIVATED_SUPPORT_TXO_TYPE, ACTIVATED_CLAIM_TXO_TYPE
 from hub.db.prefixes import PendingActivationKey, PendingActivationValue, ClaimToTXOValue
 from hub.error.base import ChainError
-from hub.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256, LFUCache, LFUCacheWithMetrics
+from hub.common import hash_to_hex_str, hash160, RPCError, HISTOGRAM_BUCKETS, StagedClaimtrieItem, sha256, LFUCache
+from hub.common import ResumableSHA256, LFUCacheWithMetrics
 from hub.scribe.db import PrimaryDB
 from hub.scribe.daemon import LBCDaemon
 from hub.scribe.transaction import Tx, TxOutput, TxInput, Block
@@ -169,10 +171,22 @@ class BlockchainProcessorService(BlockchainService):
 
         def update_mempool(unsafe_commit, mempool_prefix, to_put, to_delete):
             self.mempool.remove(to_delete)
-            touched_hashXs = self.mempool.update_mempool(to_put)
+            touched_hashXs = list(self.mempool.update_mempool(to_put))
             if self.env.index_address_status:
-                for hashX in touched_hashXs:
-                    self._get_update_hashX_mempool_status_ops(hashX)
+                status_hashers = {
+                    k: v.hasher if v else ResumableSHA256() for k, v in zip(
+                        touched_hashXs,
+                        self.db.prefix_db.hashX_history_hasher.multi_get([(hashX,) for hashX in touched_hashXs])
+                    )
+                }
+                for hashX, v in zip(
+                        touched_hashXs,
+                        self.db.prefix_db.hashX_mempool_status.multi_get([(hashX,) for hashX in touched_hashXs])):
+                    if v is not None:
+                        self.db.prefix_db.hashX_mempool_status.stash_delete((hashX,), v)
+                    hasher = status_hashers[hashX]
+                    hasher.update(self.mempool.mempool_history(hashX).encode())
+                    self.db.prefix_db.hashX_mempool_status.stash_put((hashX,), (hasher.digest(),))
             for tx_hash, raw_tx in to_put:
                 mempool_prefix.stash_put((tx_hash,), (raw_tx,))
             for tx_hash, raw_tx in to_delete.items():
@@ -1637,15 +1651,6 @@ class BlockchainProcessorService(BlockchainService):
         self.hashX_full_cache[hashX] = history
         return history
 
-    def _get_update_hashX_mempool_status_ops(self, hashX: bytes):
-        existing = self.db.prefix_db.hashX_mempool_status.get(hashX)
-        if existing:
-            self.db.prefix_db.hashX_mempool_status.stash_delete((hashX,), existing)
-        history = self._get_cached_hashX_history(hashX) + self.mempool.mempool_history(hashX)
-        if history:
-            status = sha256(history.encode())
-            self.db.prefix_db.hashX_mempool_status.stash_put((hashX,), (status,))
-
     def advance_block(self, block: Block):
         txo_count = 0
         txi_count = 0
@@ -1745,9 +1750,7 @@ class BlockchainProcessorService(BlockchainService):
         # update hashX history status hashes and compactify the histories
         self._get_update_hashX_histories_ops(height)
 
-        # only compactify adddress histories and update the status index if we're already caught up,
-        # a bulk update will happen once catchup finishes
-        if not self.db.catching_up and self.env.index_address_status:
+        if self.env.index_address_status:
             self._get_compactify_ops(height)
             self.db.last_indexed_address_status_height = height
 
@@ -1802,6 +1805,17 @@ class BlockchainProcessorService(BlockchainService):
         )
 
     def _get_compactify_ops(self, height: int):
+        def _rebuild_hasher(hist_tx_nums):
+            hasher = ResumableSHA256()
+            hasher.update(
+                b''.join(f'{tx_hash[::-1].hex()}:{bisect_right(self.db.tx_counts, tx_num)}:'.encode()
+                for tx_num, tx_hash in zip(
+                    hist_tx_nums,
+                    self.db.prefix_db.tx_hash.multi_get([(tx_num,) for tx_num in hist_tx_nums], deserialize_value=False)
+                ))
+            )
+            return hasher
+
         existing_hashX_statuses = self.db.prefix_db.hashX_status.multi_get([(hashX,) for hashX in self.hashXs_by_tx.keys()], deserialize_value=False)
         if existing_hashX_statuses:
             pack_key = self.db.prefix_db.hashX_status.pack_key
@@ -1815,6 +1829,13 @@ class BlockchainProcessorService(BlockchainService):
         block_hashX_history_deletes = []
         append_deletes_hashX_history = block_hashX_history_deletes.append
         block_hashX_history_puts = []
+
+        existing_status_hashers = {
+            k: v.hasher if v else None for k, v in zip(
+                self.hashXs_by_tx,
+                self.db.prefix_db.hashX_history_hasher.multi_get([(hashX,) for hashX in self.hashXs_by_tx])
+            )
+        }
 
         for (hashX, new_tx_nums), existing in zip(self.hashXs_by_tx.items(), existing_hashX_statuses):
             new_history = [(self.pending_transactions[tx_num], height) for tx_num in new_tx_nums]
@@ -1830,11 +1851,9 @@ class BlockchainProcessorService(BlockchainService):
             unpack_key = self.db.prefix_db.hashX_history.unpack_key
             needs_compaction = False
 
-            total_hist_txs = b''
             for k, hist in self.db.prefix_db.hashX_history.iterate(prefix=(hashX,), deserialize_key=False,
                                                                    deserialize_value=False):
                 hist_txs = unpack_history(hist)
-                total_hist_txs += hist
                 txs_extend(hist_txs)
                 hist_height = unpack_key(k).height
                 if height > reorg_limit and hist_height < height - reorg_limit:
@@ -1853,27 +1872,17 @@ class BlockchainProcessorService(BlockchainService):
                 block_hashX_history_puts.append(((hashX, 0), (compact_hist_txs,)))
             if not new_history:
                 continue
-
-            needed_tx_infos = []
-            append_needed_tx_info = needed_tx_infos.append
-            tx_infos = {}
-            for tx_num in tx_nums:
-                cached_tx_info = self.history_tx_info_cache.get(tx_num)
-                if cached_tx_info is not None:
-                    tx_infos[tx_num] = cached_tx_info
-                else:
-                    append_needed_tx_info(tx_num)
-            if needed_tx_infos:
-                for tx_num, tx_hash in zip(needed_tx_infos, self.db._get_tx_hashes(needed_tx_infos)):
-                    tx_info = f'{tx_hash[::-1].hex()}:{bisect_right(self.db.tx_counts, tx_num):d}:'
-                    tx_infos[tx_num] = tx_info
-                    self.history_tx_info_cache[tx_num] = tx_info
-            history = ''.join(map(tx_infos.__getitem__, tx_nums))
-            for tx_hash, height in new_history:
-                history += f'{tx_hash[::-1].hex()}:{height:d}:'
-            if history:
-                status = sha256(history.encode())
-                self.db.prefix_db.hashX_status.stash_put((hashX,), (status,))
+            hasher = existing_status_hashers[hashX]
+            if hasher is None:
+                hasher = _rebuild_hasher(tx_nums)
+            else:
+                self.db.prefix_db.hashX_history_hasher.stash_delete((hashX,), (hasher,))
+            hasher.update(b''.join(
+                f'{tx_hash[::-1].hex()}:{height:d}:'.encode() for tx_hash, height in new_history
+            ))
+            self.db.prefix_db.hashX_history_hasher.stash_put((hashX,), (hasher,))
+            status = hasher.digest()
+            self.db.prefix_db.hashX_status.stash_put((hashX,), (status,))
 
         self.db.prefix_db.multi_delete(block_hashX_history_deletes)
         self.db.prefix_db.hashX_history.stash_multi_put(block_hashX_history_puts)
@@ -2134,9 +2143,6 @@ class BlockchainProcessorService(BlockchainService):
 
     async def _finished_initial_catch_up(self):
         self.log.info(f'caught up to height {self.height}')
-
-        if self.env.index_address_status and self.db.last_indexed_address_status_height < self.db.db_height:
-            await self.db.rebuild_hashX_status_index(self.db.last_indexed_address_status_height)
 
         # Flush everything but with catching_up->False state.
         self.db.catching_up = False

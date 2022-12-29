@@ -3,6 +3,7 @@ import struct
 import array
 import base64
 from typing import Union, Tuple, NamedTuple, Optional
+from hub.common import ResumableSHA256
 from hub.db.common import DB_PREFIXES
 from hub.db.interface import BasePrefixDB, ROW_TYPES, PrefixRow
 from hub.schema.url import normalize_name
@@ -1851,6 +1852,46 @@ class FutureEffectiveAmountPrefixRow(PrefixRow):
         return cls.pack_key(claim_hash), cls.pack_value(future_effective_amount)
 
 
+class HashXHistoryHasherKey(NamedTuple):
+    hashX: bytes
+
+
+class HashXHistoryHasherValue(NamedTuple):
+    hasher: ResumableSHA256
+
+
+class HashXHistoryHasherPrefixRow(PrefixRow):
+    prefix = DB_PREFIXES.hashX_history_hash.value
+    key_struct = struct.Struct(b'>11s')
+    value_struct = struct.Struct(b'>120s')
+    cache_size = 1024 * 1024 * 64
+
+    key_part_lambdas = [
+        lambda: b'',
+        struct.Struct(b'>11s').pack
+    ]
+
+    @classmethod
+    def pack_key(cls, hashX: bytes):
+        return super().pack_key(hashX)
+
+    @classmethod
+    def unpack_key(cls, key: bytes) -> HashXHistoryHasherKey:
+        return HashXHistoryHasherKey(*super().unpack_key(key))
+
+    @classmethod
+    def pack_value(cls, hasher: ResumableSHA256) -> bytes:
+        return super().pack_value(hasher.get_state())
+
+    @classmethod
+    def unpack_value(cls, data: bytes) -> HashXHistoryHasherValue:
+        return HashXHistoryHasherValue(ResumableSHA256(*super().unpack_value(data)))
+
+    @classmethod
+    def pack_item(cls, hashX: bytes,  hasher: ResumableSHA256):
+        return cls.pack_key(hashX), cls.pack_value(hasher)
+
+
 class PrefixDB(BasePrefixDB):
     def __init__(self, path: str, reorg_limit: int = 200, max_open_files: int = 64,
                  secondary_path: str = '', unsafe_prefixes: Optional[typing.Set[bytes]] = None,
@@ -1897,6 +1938,7 @@ class PrefixDB(BasePrefixDB):
         self.hashX_mempool_status = HashXMempoolStatusPrefixRow(db, self._op_stack)
         self.effective_amount = EffectiveAmountPrefixRow(db, self._op_stack)
         self.future_effective_amount = FutureEffectiveAmountPrefixRow(db, self._op_stack)
+        self.hashX_history_hasher = HashXHistoryHasherPrefixRow(db, self._op_stack)
 
 
 def auto_decode_item(key: bytes, value: bytes) -> Union[Tuple[NamedTuple, NamedTuple], Tuple[bytes, bytes]]:
