@@ -5,7 +5,7 @@ import time
 from typing import List
 from concurrent.futures.thread import ThreadPoolExecutor
 from bisect import bisect_right
-from hub.common import sha256
+from hub.common import ResumableSHA256
 from hub.db import SecondaryDB
 
 
@@ -35,16 +35,19 @@ class PrimaryDB(SecondaryDB):
             if last_hashX:
                 yield last_hashX
 
-        def hashX_status_from_history(history: bytes) -> bytes:
+        def hashX_status_from_history(history: bytes) -> ResumableSHA256:
             tx_counts = self.tx_counts
             hist_tx_nums = array.array('I')
             hist_tx_nums.frombytes(history)
-            digest = hashlib.sha256()
-            for tx_num, tx_hash in zip(
+            digest = ResumableSHA256()
+            digest.update(
+                b''.join(f'{tx_hash[::-1].hex()}:{bisect_right(tx_counts, tx_num)}:'.encode()
+                for tx_num, tx_hash in zip(
                     hist_tx_nums,
-                    self.prefix_db.tx_hash.multi_get([(tx_num,) for tx_num in hist_tx_nums], deserialize_value=False)):
-                digest.update(f'{tx_hash[::-1].hex()}:{bisect_right(tx_counts, tx_num)}:'.encode())
-            return digest.digest()
+                    self.prefix_db.tx_hash.multi_get([(tx_num,) for tx_num in hist_tx_nums], deserialize_value=False)
+                ))
+            )
+            return digest
 
         start = time.perf_counter()
 
@@ -67,16 +70,23 @@ class PrimaryDB(SecondaryDB):
             hashX_cnt += 1
             key = prefix_db.hashX_status.pack_key(hashX)
             history = b''.join(prefix_db.hashX_history.iterate(prefix=(hashX,), deserialize_value=False, include_key=False))
-            status = hashX_status_from_history(history)
+            digester = hashX_status_from_history(history)
+            status = digester.digest()
             existing_status = prefix_db.hashX_status.get(hashX, deserialize_value=False)
-            if existing_status and existing_status == status:
-                continue
-            elif not existing_status:
+            existing_digester = prefix_db.hashX_history_hasher.get(hashX)
+            if not existing_status:
                 prefix_db.stash_raw_put(key, status)
                 op_cnt += 1
             else:
                 prefix_db.stash_raw_delete(key, existing_status)
                 prefix_db.stash_raw_put(key, status)
+                op_cnt += 2
+            if not existing_digester:
+                prefix_db.hashX_history_hasher.stash_put((hashX,), (digester,))
+                op_cnt += 1
+            else:
+                prefix_db.hashX_history_hasher.stash_delete((hashX,), existing_digester)
+                prefix_db.hashX_history_hasher.stash_put((hashX,), (digester,))
                 op_cnt += 2
             if op_cnt > 100000:
                 prefix_db.unsafe_commit()
