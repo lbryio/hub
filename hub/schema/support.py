@@ -1,5 +1,5 @@
 from hub.schema.base import Signable
-from hub.schema.types.v2.support_pb2 import Support as SupportMessage
+from lbry_types.v2.support_pb2 import Support as SupportMessage
 
 
 class Support(Signable):

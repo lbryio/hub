@@ -134,6 +134,8 @@ class ElasticSyncService(BlockchainReaderService):
         index_version = await self.get_index_version()
 
         res = await self.sync_client.indices.create(self.index, INDEX_DEFAULT_SETTINGS, ignore=400)
+        if 'error' in res:
+            self.log.warning("es index create failed: %s", res)
         acked = res.get('acknowledged', False)
 
         if acked:
@@ -189,7 +191,6 @@ class ElasticSyncService(BlockchainReaderService):
                         await self.sync_client.update_by_query(
                             self.index, body=self.update_filter_query(censor_type, only_channels(batch), True),
                             slices=4)
-                    await self.sync_client.indices.refresh(self.index)
 
         if filtered_streams:
             await batched_update_filter(filtered_streams, False, Censor.SEARCH)
@@ -199,6 +200,8 @@ class ElasticSyncService(BlockchainReaderService):
             await batched_update_filter(blocked_streams, False, Censor.RESOLVE)
         if blocked_channels:
             await batched_update_filter(blocked_channels, True, Censor.RESOLVE)
+        if filtered_streams or filtered_channels or blocked_streams or blocked_channels:
+            await self.sync_client.indices.refresh(self.index)
 
     @staticmethod
     def _upsert_claim_query(index, claim):
