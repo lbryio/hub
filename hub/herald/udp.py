@@ -244,8 +244,8 @@ class StatusServer:
         self._protocols.append(proto)
 
     async def stop(self):
-        for p in self._protocols:
-            await p.close()
+        for proto in self._protocols:
+            await proto.close()
         self._protocols.clear()
 
     @property
@@ -253,16 +253,16 @@ class StatusServer:
         return self._protocols
 
     def set_unavailable(self):
-        for p in self._protocols:
-            p.set_unavailable()
+        for proto in self._protocols:
+            proto.set_unavailable()
 
     def set_available(self):
-        for p in self._protocols:
-            p.set_available()
+        for proto in self._protocols:
+            proto.set_available()
 
     def set_height(self, height: int, tip: bytes):
-        for p in self._protocols:
-            p.set_height(height, tip)
+        for proto in self._protocols:
+            proto.set_height(height, tip)
 
 
 class SPVStatusClientProtocol(asyncio.DatagramProtocol):
