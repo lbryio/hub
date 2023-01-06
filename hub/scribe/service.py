@@ -1873,6 +1873,8 @@ class BlockchainProcessorService(BlockchainService):
                 continue
             hasher = existing_status_hashers[hashX]
             if hasher is None:
+                # this is to migrate in the new column family, in the future it can be a new digester
+                # hasher = ResumableSHA256()
                 hasher = _rebuild_hasher(tx_nums)
             else:
                 self.db.prefix_db.hashX_history_hasher.stash_delete((hashX,), (hasher,))
