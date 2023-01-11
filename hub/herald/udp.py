@@ -275,6 +275,11 @@ class SPVStatusClientProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data: bytes, addr: Union[Tuple[str, int], Tuple[str, int, int, int]]):
         try:
+            if len(addr) > 2: # IPv6 with possible mapped IPv4
+                ipaddr = ipaddress.ip_address(addr[0])
+                if ipaddr.ipv4_mapped:
+                    # mapped IPv4 address identified
+                    addr = (ipaddr.ipv4_mapped.compressed, addr[1])
             self.responses.put_nowait(((addr[:2], perf_counter()), SPVPong.decode(data)))
         except (ValueError, struct.error, AttributeError, TypeError, RuntimeError):
             return
