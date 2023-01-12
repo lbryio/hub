@@ -138,11 +138,10 @@ class BlockchainProcessorService(BlockchainService):
     def open_db(self):
         env = self.env
         self.db = PrimaryDB(
-            env.coin, env.db_dir, env.reorg_limit, cache_all_claim_txos=env.cache_all_claim_txos,
-            cache_all_tx_hashes=env.cache_all_tx_hashes, max_open_files=env.db_max_open_files,
-            blocking_channel_ids=env.blocking_channel_ids, filtering_channel_ids=env.filtering_channel_ids,
-            executor=self._executor, index_address_status=env.index_address_status,
-            enforce_integrity=not env.db_disable_integrity_checks
+            env.coin, env.db_dir, env.reorg_limit, cache_all_tx_hashes=env.cache_all_tx_hashes,
+            max_open_files=env.db_max_open_files, blocking_channel_ids=env.blocking_channel_ids,
+            filtering_channel_ids=env.filtering_channel_ids, executor=self._executor,
+            index_address_status=env.index_address_status, enforce_integrity=not env.db_disable_integrity_checks
         )
 
     async def run_in_thread_with_lock(self, func, *args):
@@ -276,9 +275,6 @@ class BlockchainProcessorService(BlockchainService):
                 for _ in range(count):
                     await self.run_in_thread_with_lock(self.backup_block)
                     self.log.info(f'backed up to height {self.height:,d}')
-
-                    if self.env.cache_all_claim_txos:
-                        await self.db._read_claim_txos()  # TODO: don't do this
                 await self.prefetcher.reset_height(self.height)
                 self.reorg_count_metric.inc()
             except:
@@ -406,12 +402,6 @@ class BlockchainProcessorService(BlockchainService):
             self.updated_claims.add(claim_hash)
             if claim_hash not in self.updated_claim_previous_activations:
                 self.updated_claim_previous_activations[claim_hash] = activation
-
-        if self.env.cache_all_claim_txos:
-            self.db.claim_to_txo[claim_hash] = ClaimToTXOValue(
-                tx_num, nout, root_tx_num, root_idx, txo.value, channel_signature_is_valid, claim_name
-            )
-            self.db.txo_to_claim[tx_num][nout] = claim_hash
 
         pending = StagedClaimtrieItem(
             claim_name, normalized_name, claim_hash, txo.value, self.coin.get_expiration_height(height), tx_num, nout,
@@ -703,11 +693,6 @@ class BlockchainProcessorService(BlockchainService):
                     if 0 < activation <= self.height:
                         self.effective_amount_delta[claim_hash] -= spent.amount
                 self.future_effective_amount_delta[spent.claim_hash] -= spent.amount
-                if self.env.cache_all_claim_txos:
-                    claim_hash = self.db.txo_to_claim[txin_num].pop(nout)
-                    if not self.db.txo_to_claim[txin_num]:
-                        self.db.txo_to_claim.pop(txin_num)
-                    self.db.claim_to_txo.pop(claim_hash)
                 if spent.reposted_claim_hash:
                     self.pending_reposted.add(spent.reposted_claim_hash)
                 if spent.signing_hash and spent.channel_signature_is_valid and spent.signing_hash not in self.abandoned_claims:

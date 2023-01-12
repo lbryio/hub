@@ -6,11 +6,11 @@ from hub.db import SecondaryDB
 
 class HeraldDB(SecondaryDB):
     def __init__(self, coin, db_dir: str, secondary_name: str, max_open_files: int = -1, reorg_limit: int = 200,
-                 cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
+                 cache_all_tx_hashes: bool = False,
                  blocking_channel_ids: List[str] = None,
                  filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
                  index_address_status=False, merkle_cache_size=32768, tx_cache_size=32768):
-        super().__init__(coin, db_dir, secondary_name, max_open_files, reorg_limit, cache_all_claim_txos,
+        super().__init__(coin, db_dir, secondary_name, max_open_files, reorg_limit,
                          cache_all_tx_hashes, blocking_channel_ids, filtering_channel_ids, executor,
                          index_address_status, merkle_cache_size, tx_cache_size)
         # self.headers = None

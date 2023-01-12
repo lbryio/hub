@@ -3,11 +3,11 @@ from hub.env import Env
 
 class ElasticEnv(Env):
     def __init__(self, db_dir=None, max_query_workers=None, chain=None, reorg_limit=None, prometheus_port=None,
-                 cache_all_tx_hashes=None, cache_all_claim_txos=None, elastic_host=None, elastic_port=None,
+                 cache_all_tx_hashes=None, elastic_host=None, elastic_port=None,
                  es_index_prefix=None, elastic_notifier_host=None, elastic_notifier_port=None,
                  blocking_channel_ids=None, filtering_channel_ids=None, reindex=False):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
-                         cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids)
+                         blocking_channel_ids, filtering_channel_ids)
         self.elastic_host = elastic_host if elastic_host is not None else self.default('ELASTIC_HOST', 'localhost')
         self.elastic_port = elastic_port if elastic_port is not None else self.integer('ELASTIC_PORT', 9200)
         self.elastic_notifier_host = elastic_notifier_host if elastic_notifier_host is not None else self.default(
@@ -43,7 +43,7 @@ class ElasticEnv(Env):
             elastic_port=args.elastic_port, max_query_workers=args.max_query_workers, chain=args.chain,
             es_index_prefix=args.es_index_prefix, reorg_limit=args.reorg_limit,
             prometheus_port=args.prometheus_port, cache_all_tx_hashes=args.cache_all_tx_hashes,
-            cache_all_claim_txos=args.cache_all_claim_txos, blocking_channel_ids=args.blocking_channel_ids,
+            blocking_channel_ids=args.blocking_channel_ids,
             filtering_channel_ids=args.filtering_channel_ids, elastic_notifier_host=args.elastic_notifier_host,
             elastic_notifier_port=args.elastic_notifier_port
         )

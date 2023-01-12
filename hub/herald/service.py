@@ -53,7 +53,7 @@ class HubServerService(BlockchainReaderService):
     def open_db(self):
         env = self.env
         self.db = HeraldDB(
-            env.coin, env.db_dir, self.secondary_name, -1, env.reorg_limit, env.cache_all_claim_txos,
+            env.coin, env.db_dir, self.secondary_name, -1, env.reorg_limit,
             env.cache_all_tx_hashes, blocking_channel_ids=env.blocking_channel_ids,
             filtering_channel_ids=env.filtering_channel_ids, executor=self._executor,
             index_address_status=env.index_address_status, merkle_cache_size=env.merkle_cache_size,
