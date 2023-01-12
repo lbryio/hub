@@ -37,7 +37,7 @@ class SecondaryDB:
     DB_VERSIONS = [7, 8, 9, 10, 11, 12]
 
     def __init__(self, coin, db_dir: str, secondary_name: str, max_open_files: int = -1, reorg_limit: int = 200,
-                 cache_all_claim_txos: bool = False, cache_all_tx_hashes: bool = False,
+                 cache_all_tx_hashes: bool = False,
                  blocking_channel_ids: List[str] = None,
                  filtering_channel_ids: List[str] = None, executor: ThreadPoolExecutor = None,
                  index_address_status=False, merkle_cache_size=32768, tx_cache_size=32768,
@@ -47,7 +47,6 @@ class SecondaryDB:
         self._executor = executor
         self._db_dir = db_dir
         self._reorg_limit = reorg_limit
-        self._cache_all_claim_txos = cache_all_claim_txos
         self._cache_all_tx_hashes = cache_all_tx_hashes
         self._secondary_name = secondary_name
         if secondary_name:
@@ -100,9 +99,6 @@ class SecondaryDB:
         self.total_transactions: List[bytes] = []
         self.tx_num_mapping: Dict[bytes, int] = {}
 
-        # these are only used if the cache_all_claim_txos setting is on
-        self.claim_to_txo: Dict[bytes, ClaimToTXOValue] = {}
-        self.txo_to_claim: DefaultDict[int, Dict[int, bytes]] = defaultdict(dict)
         self.genesis_bytes = bytes.fromhex(self.coin.GENESIS_HASH)
 
     def get_claim_from_txo(self, tx_num: int, tx_idx: int) -> Optional[TXOToClaimValue]:
@@ -956,21 +952,6 @@ class SecondaryDB:
         else:
             assert self.db_tx_count == 0
 
-    async def _read_claim_txos(self):
-        def read_claim_txos():
-            set_claim_to_txo = self.claim_to_txo.__setitem__
-            for k, v in self.prefix_db.claim_to_txo.iterate(fill_cache=False):
-                set_claim_to_txo(k.claim_hash, v)
-                self.txo_to_claim[v.tx_num][v.position] = k.claim_hash
-
-        self.claim_to_txo.clear()
-        self.txo_to_claim.clear()
-        start = time.perf_counter()
-        self.logger.info("loading claims")
-        await asyncio.get_event_loop().run_in_executor(self._executor, read_claim_txos)
-        ts = time.perf_counter() - start
-        self.logger.info("loaded %i claim txos in %ss", len(self.claim_to_txo), round(ts, 4))
-
     # async def _read_headers(self):
     #     # if self.headers is not None:
     #     #     return
@@ -1063,8 +1044,6 @@ class SecondaryDB:
     async def initialize_caches(self):
         await self._read_tx_counts()
         await self._read_block_hashes()
-        if self._cache_all_claim_txos:
-            await self._read_claim_txos()
         if self._cache_all_tx_hashes:
             await self._read_tx_hashes()
         if self.db_height > 0:
@@ -1154,15 +1133,9 @@ class SecondaryDB:
         }
 
     def get_cached_claim_txo(self, claim_hash: bytes) -> Optional[ClaimToTXOValue]:
-        if self._cache_all_claim_txos:
-            return self.claim_to_txo.get(claim_hash)
         return self.prefix_db.claim_to_txo.get_pending(claim_hash)
 
     def get_cached_claim_hash(self, tx_num: int, position: int) -> Optional[bytes]:
-        if self._cache_all_claim_txos:
-            if tx_num not in self.txo_to_claim:
-                return
-            return self.txo_to_claim[tx_num].get(position, None)
         v = self.prefix_db.txo_to_claim.get_pending(tx_num, position)
         return None if not v else v.claim_hash
 

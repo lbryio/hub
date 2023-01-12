@@ -30,7 +30,7 @@ class Env:
         pass
 
     def __init__(self, db_dir=None, max_query_workers=None, chain=None, reorg_limit=None,
-                 prometheus_port=None, cache_all_tx_hashes=None, cache_all_claim_txos=None,
+                 prometheus_port=None, cache_all_tx_hashes=None,
                  blocking_channel_ids=None, filtering_channel_ids=None, index_address_status=None):
 
         self.logger = logging.getLogger(__name__)
@@ -46,7 +46,6 @@ class Env:
         self.reorg_limit = reorg_limit if reorg_limit is not None else self.integer('REORG_LIMIT', self.coin.REORG_LIMIT)
         self.prometheus_port = prometheus_port if prometheus_port is not None else self.integer('PROMETHEUS_PORT', 0)
         self.cache_all_tx_hashes = cache_all_tx_hashes if cache_all_tx_hashes is not None else self.boolean('CACHE_ALL_TX_HASHES', False)
-        self.cache_all_claim_txos = cache_all_claim_txos if cache_all_claim_txos is not None else self.boolean('CACHE_ALL_CLAIM_TXOS', False)
         # Filtering / Blocking
         self.blocking_channel_ids = blocking_channel_ids if blocking_channel_ids is not None else self.default(
             'BLOCKING_CHANNEL_IDS', '').split(' ')
@@ -171,11 +170,6 @@ class Env:
                                  "resolve, transaction fetching, and block sync all faster at the expense of higher "
                                  "memory usage (at least 10GB more). Can be set in env with 'CACHE_ALL_TX_HASHES'.",
                             default=cls.boolean('CACHE_ALL_TX_HASHES', False))
-        parser.add_argument('--cache_all_claim_txos', action='store_true',
-                            help="Load all claim txos into memory. This will make address subscriptions and sync, "
-                                 "resolve, transaction fetching, and block sync all faster at the expense of higher "
-                                 "memory usage. Can be set in env with 'CACHE_ALL_CLAIM_TXOS'.",
-                            default=cls.boolean('CACHE_ALL_CLAIM_TXOS', False))
         parser.add_argument('--prometheus_port', type=int, default=cls.integer('PROMETHEUS_PORT', 0),
                             help="Port for prometheus metrics to listen on, disabled by default. "
                                  "Can be set in env with 'PROMETHEUS_PORT'.")

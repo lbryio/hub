@@ -19,7 +19,7 @@ def parse_es_services(elastic_services_arg: str):
 
 class ServerEnv(Env):
     def __init__(self, db_dir=None, max_query_workers=None, chain=None, reorg_limit=None,
-                 prometheus_port=None, cache_all_tx_hashes=None, cache_all_claim_txos=None,
+                 prometheus_port=None, cache_all_tx_hashes=None,
                  daemon_url=None, host=None, elastic_services=None, es_index_prefix=None,
                  tcp_port=None, udp_port=None, banner_file=None, allow_lan_udp=None, country=None,
                  payment_address=None, donation_address=None, max_send=None, max_receive=None, max_sessions=None,
@@ -29,7 +29,7 @@ class ServerEnv(Env):
                  merkle_cache_size=None, resolved_url_cache_size=None, tx_cache_size=None,
                  history_tx_cache_size=None, largest_address_history_cache_size=None):
         super().__init__(db_dir, max_query_workers, chain, reorg_limit, prometheus_port, cache_all_tx_hashes,
-                         cache_all_claim_txos, blocking_channel_ids, filtering_channel_ids, index_address_status)
+                         blocking_channel_ids, filtering_channel_ids, index_address_status)
         self.daemon_url = daemon_url if daemon_url is not None else self.required('DAEMON_URL')
         self.host = host if host is not None else self.default('HOST', 'localhost')
         self.elastic_services = deque(parse_es_services(elastic_services or 'localhost:9200/localhost:19080'))
@@ -153,7 +153,7 @@ class ServerEnv(Env):
             es_index_prefix=args.es_index_prefix, reorg_limit=args.reorg_limit, tcp_port=args.tcp_port,
             udp_port=args.udp_port, prometheus_port=args.prometheus_port, banner_file=args.banner_file,
             allow_lan_udp=args.allow_lan_udp, cache_all_tx_hashes=args.cache_all_tx_hashes,
-            cache_all_claim_txos=args.cache_all_claim_txos, country=args.country, payment_address=args.payment_address,
+            country=args.country, payment_address=args.payment_address,
             donation_address=args.donation_address, max_send=args.max_send, max_receive=args.max_receive,
             max_sessions=args.max_sessions, session_timeout=args.session_timeout,
             drop_client=args.drop_client, description=args.description, daily_fee=args.daily_fee,
