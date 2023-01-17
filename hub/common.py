@@ -610,11 +610,13 @@ IPV4_TO_6_RELAY_SUBNET = ipaddress.ip_network('192.88.99.0/24')
 def is_valid_public_ipv4(address, allow_localhost: bool = False, allow_lan: bool = False):
     try:
         parsed_ip = ipaddress.ip_address(address)
+        if parsed_ip.version != 4:
+            return False
         if parsed_ip.is_loopback:
             return allow_localhost
         if parsed_ip.is_private:
             return allow_lan
-        if any((parsed_ip.version != 4, parsed_ip.is_unspecified, parsed_ip.is_link_local, parsed_ip.is_loopback,
+        if any((parsed_ip.is_unspecified, parsed_ip.is_link_local, parsed_ip.is_loopback,
                 parsed_ip.is_multicast, parsed_ip.is_reserved, parsed_ip.is_private)):
             return False
         else:
@@ -626,14 +628,15 @@ def is_valid_public_ipv4(address, allow_localhost: bool = False, allow_lan: bool
 def is_valid_public_ipv6(address, allow_localhost: bool = False, allow_lan: bool = False):
     try:
         parsed_ip = ipaddress.ip_address(address)
+        if parsed_ip.version != 6:
+            return False
         if parsed_ip.is_loopback:
             return allow_localhost
         if parsed_ip.is_private:
             return allow_lan
-        return not any((parsed_ip.version != 6, parsed_ip.is_unspecified,
-                        parsed_ip.is_link_local, parsed_ip.is_loopback,
-                        parsed_ip.is_multicast, parsed_ip.is_reserved,
-                        parsed_ip.is_private, parsed_ip.ipv4_mapped))
+        return not any((parsed_ip.is_unspecified, parsed_ip.is_link_local, parsed_ip.is_loopback,
+                        parsed_ip.is_multicast, parsed_ip.is_reserved, parsed_ip.is_private,
+                        parsed_ip.ipv4_mapped))
     except (ipaddress.AddressValueError, ValueError):
         return False
 
