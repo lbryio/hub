@@ -2071,7 +2071,7 @@ class BlockchainProcessorService(BlockchainService):
         self._caught_up_event = caught_up_event
         try:
             if os.path.exists(self.db._need_restart_path):
-                raise MemoryError()
+                raise RuntimeError('scribe restart is needed')
             if self.height != self.daemon.cached_height() and not self.db.catching_up:
                 await self._need_catch_up()  # tell the readers that we're still catching up with lbrycrd/lbcd
             while not self._stopping:
