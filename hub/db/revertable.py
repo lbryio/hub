@@ -324,9 +324,21 @@ class RevertableOpStack:
         """
         Unpack and apply a sequence of undo ops from serialized undo bytes
         """
-        while packed:
-            op, packed = RevertableOp.unpack(packed)
-            self.append_op(op)
+        offset = 0
+        packed_size = len(packed)
+        while offset < packed_size:
+            is_put, key_len, val_len = _OP_STRUCT.unpack(packed[offset:offset + 9])
+            offset += 9
+            key = packed[offset:offset + key_len]
+            offset += key_len
+            value = packed[offset:offset + val_len]
+            offset += val_len
+            if is_put == 1:
+                op = RevertablePut(key, value)
+            else:
+                op = RevertableDelete(key, value)
+            self._stash.append(op)
+            self._stashed_last_op_for_key[op.key] = op
 
     def get_pending_op(self, key: bytes) -> Optional[RevertableOp]:
         if key in self._stashed_last_op_for_key:
