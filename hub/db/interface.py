@@ -273,6 +273,7 @@ class BasePrefixDB:
         undo_c_f = self.column_families[DB_PREFIXES.undo.value]
         undo_info = self._db.get((undo_c_f, undo_key))
         self._op_stack.apply_packed_undo_ops(undo_info)
+        self._op_stack.validate_and_apply_stashed_ops()
         try:
             with self._db.write_batch(sync=True) as batch:
                 batch_put = batch.put
