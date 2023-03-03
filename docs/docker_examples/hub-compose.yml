@@ -14,7 +14,7 @@ services:
       - "lbry_rocksdb:/database"
     environment:
       - HUB_COMMAND=scribe
-      - SNAPSHOT_URL=https://snapshots.lbry.com/hub/block_1288882/lbry-rocksdb.tar
+      - SNAPSHOT_URL=https://snapshots.lbry.com/hub/block_1312050/lbry-rocksdb.tar
     command:
       - "--daemon_url=http://lbry:lbry@127.0.0.1:9245"
       - "--max_query_workers=2"
