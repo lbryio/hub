@@ -116,10 +116,6 @@ class Env:
         result = [part.strip() for part in host.split(',')]
         if len(result) == 1:
             result = result[0]
-        if result == 'localhost':
-            # 'localhost' resolves to ::1 (ipv6) on many systems, which fails on default setup of
-            # docker, using 127.0.0.1 instead forces ipv4
-            result = '127.0.0.1'
         return result
 
     def sane_max_sessions(self):

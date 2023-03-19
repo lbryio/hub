@@ -1,3 +1,4 @@
+import errno
 import time
 import typing
 import asyncio
@@ -170,10 +171,20 @@ class HubServerService(BlockchainReaderService):
 
     async def start_status_server(self):
         if self.env.udp_port and int(self.env.udp_port):
-            await self.status_server.start(
-                0, bytes.fromhex(self.env.coin.GENESIS_HASH)[::-1], self.env.country,
-                self.env.host, self.env.udp_port, self.env.allow_lan_udp
-            )
+            hosts = self.env.cs_host()
+            started = False
+            while not started:
+                try:
+                    await self.status_server.start(
+                        0, bytes.fromhex(self.env.coin.GENESIS_HASH)[::-1], self.env.country,
+                        hosts, self.env.udp_port, self.env.allow_lan_udp
+                    )
+                    started = True
+                except OSError as e:
+                    if e.errno is errno.EADDRINUSE:
+                        await asyncio.sleep(3)
+                        continue
+                    raise
 
     def _iter_start_tasks(self):
         yield self.start_status_server()
