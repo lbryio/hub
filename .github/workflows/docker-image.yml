@@ -10,7 +10,7 @@ on:
 
 env:
   # github.repository as <account>/<repo>
-  IMAGE_NAME: lbry/hub
+  IMAGE_NAME: lbryfoundation/hub
 
 jobs:
   build:
