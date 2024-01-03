@@ -1,35 +1,35 @@
 ## LBRY Hub
 
-This repo provides a python library, `hub`, for building services that use the processed data from the [LBRY blockchain](https://github.com/lbryio/lbrycrd) in an ongoing manner. Hub contains a set of three core executable services that are used together:
- * `scribe` ([hub.scribe.service](https://github.com/lbryio/hub/tree/master/hub/service.py)) - maintains a [rocksdb](https://github.com/lbryio/lbry-rocksdb) database containing the LBRY blockchain.
- * `herald` ([hub.herald.service](https://github.com/lbryio/hub/tree/master/hub/herald/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryio/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain. A drop in replacement port of herald written in go - [herald.go](https://github.com/lbryio/herald.go) is currently being worked on.
- * `scribe-elastic-sync` ([hub.elastic_sync.service](https://github.com/lbryio/hub/tree/master/hub/elastic_sync/service.py)) - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
+This repo provides a python library, `hub`, for building services that use the processed data from the LBRY blockchain ([LBRYCRD](https://github.com/lbryfoundation/lbrycrd) or [LBCD](https://github.com/lbryfoundation/lbcd)) in an ongoing manner. Hub contains a set of three core executable services that are used together:
+ * `scribe` ([hub.scribe.service](https://github.com/lbryfoundation/hub/tree/master/hub/service.py)) - maintains a [rocksdb](https://github.com/lbryfoundation/lbry-rocksdb) database containing the LBRY blockchain.
+ * `herald` ([hub.herald.service](https://github.com/lbryfoundation/hub/tree/master/hub/herald/service.py)) - an electrum server for thin-wallet clients (such as [lbry-sdk](https://github.com/lbryfoundation/lbry-sdk)), provides an api for clients to use thin simple-payment-verification (spv) wallets and to resolve and search claims published to the LBRY blockchain. A drop in replacement port of herald written in go - [herald.go](https://github.com/lbryfoundation/herald.go) is currently being worked on.
+ * `scribe-elastic-sync` ([hub.elastic_sync.service](https://github.com/lbryfoundation/hub/tree/master/hub/elastic_sync/service.py)) - a utility to maintain an elasticsearch database of metadata for claims in the LBRY blockchain
 
-![](https://raw.githubusercontent.com/lbryio/hub/master/docs/diagram.png)
+![](https://raw.githubusercontent.com/lbryfoundation/hub/master/docs/diagram.png)
 
 Features and overview of `hub` as a python library:
  * Uses Python 3.7-3.9 (3.10 probably works but hasn't yet been tested)
- * An interface developers may implement in order to build their own applications able to receive up-to-date blockchain data in an ongoing manner ([hub.service.BlockchainReaderService](https://github.com/lbryio/hub/tree/master/hub/service.py))
- * Protobuf schema for encoding and decoding metadata stored on the blockchain ([hub.schema](https://github.com/lbryio/hub/tree/master/hub/schema))
- * [Rocksdb 6.25.3](https://github.com/lbryio/lbry-rocksdb/) based database containing the blockchain data ([hub.db](https://github.com/lbryio/hub/tree/master/hub/db))
- * [A community driven performant trending algorithm](https://raw.githubusercontent.com/lbryio/hub/master/docs/trending%20algorithm.pdf) for searching claims ([code](https://github.com/lbryio/hub/blob/master/hub/elastic_sync/fast_ar_trending.py))
+ * An interface developers may implement in order to build their own applications able to receive up-to-date blockchain data in an ongoing manner ([hub.service.BlockchainReaderService](https://github.com/lbryfoundation/hub/tree/master/hub/service.py))
+ * Protobuf schema for encoding and decoding metadata stored on the blockchain ([hub.schema](https://github.com/lbryfoundation/hub/tree/master/hub/schema))
+ * [Rocksdb 6.25.3](https://github.com/lbryfoundation/lbry-rocksdb/) based database containing the blockchain data ([hub.db](https://github.com/lbryfoundation/hub/tree/master/hub/db))
+ * [A community driven performant trending algorithm](https://raw.githubusercontent.com/lbryfoundation/hub/master/docs/trending%20algorithm.pdf) for searching claims ([code](https://github.com/lbryfoundation/hub/blob/master/hub/elastic_sync/fast_ar_trending.py))
 
 ## Installation
 
 Scribe may be run from source, a binary, or a docker image.
-Our [releases page](https://github.com/lbryio/hub/releases) contains pre-built binaries of the latest release, pre-releases, and past releases for macOS and Debian-based Linux.
-Prebuilt [docker images](https://hub.docker.com/r/lbry/hub/tags) are also available.
+Our [releases page](https://github.com/lbryfoundation/hub/releases) contains pre-built binaries of the latest release, pre-releases, and past releases for macOS and Debian-based Linux.
+Prebuilt [docker images](https://hub.docker.com/r/lbryfoundation/hub/tags) are also available.
 
 ### Prebuilt docker image
 
-`docker pull lbry/hub:master`
+`docker pull lbryfoundation/hub:master`
 
 ### Build your own docker image
 
 ```
-git clone https://github.com/lbryio/hub.git
+git clone https://github.com/lbryfoundation/hub.git
 cd hub
-docker build -t lbry/hub:development .
+docker build -t lbryfoundation/hub:development .
 ```
 
 ### Install from source
@@ -38,7 +38,7 @@ Scribe has been tested with python 3.7-3.9. Higher versions probably work but ha
 
 1. clone the scribe repo
 ```
-git clone https://github.com/lbryio/hub.git
+git clone https://github.com/lbryfoundation/hub.git
 cd hub
 ```
 2. make a virtual env
@@ -59,16 +59,16 @@ These can also optionally be run with `python -m hub.scribe`, `python -m hub.ela
 
 ### Requirements
 
-Scribe needs elasticsearch and either the [lbrycrd](https://github.com/lbryio/lbrycrd) or [lbcd](https://github.com/lbryio/lbcd) blockchain daemon to be running.
+Scribe needs elasticsearch and either the [lbrycrd](https://github.com/lbryfoundation/lbrycrd) or [lbcd](https://github.com/lbryfoundation/lbcd) blockchain daemon to be running.
 
 With options for high performance, if you have 64gb of memory and 12 cores, everything can be run on the same machine. However, the recommended way is with elasticsearch on one instance with 8gb of memory and at least 4 cores dedicated to it and the blockchain daemon on another with 16gb of memory and at least 4 cores. Then the scribe hub services can be run their own instance with between 16 and 32gb of memory (depending on settings) and 8 cores. 
 
 As of block 1147423 (4/21/22) the size of the scribe rocksdb database is 120GB and the size of the elasticsearch volume is 63GB.
 
 ### docker-compose
-The recommended way to run a scribe hub is with docker. See [this guide](https://github.com/lbryio/hub/blob/master/docs/cluster_guide.md) for instructions.
+The recommended way to run a scribe hub is with docker. See [this guide](https://github.com/lbryfoundation/hub/blob/master/docs/cluster_guide.md) for instructions.
 
-If you have the resources to run all of the services on one machine (at least 300gb of fast storage, preferably nvme, 64gb of RAM, 12 fast cores), see [this](https://github.com/lbryio/hub/blob/master/docs/docker_examples/docker-compose.yml) docker-compose example.
+If you have the resources to run all of the services on one machine (at least 300gb of fast storage, preferably nvme, 64gb of RAM, 12 fast cores), see [this](https://github.com/lbryfoundation/hub/blob/master/docs/docker_examples/docker-compose.yml) docker-compose example.
 
 ### From source
 
@@ -76,7 +76,7 @@ If you have the resources to run all of the services on one machine (at least 30
 
 #### Content blocking and filtering
 
-For various reasons it may be desirable to block or filtering content from claim search and resolve results, [here](https://github.com/lbryio/hub/blob/master/docs/blocking.md) are instructions for how to configure and use this feature as well as information about the recommended defaults.
+For various reasons it may be desirable to block or filtering content from claim search and resolve results, [here](https://github.com/lbryfoundation/hub/blob/master/docs/blocking.md) are instructions for how to configure and use this feature as well as information about the recommended defaults.
 
 #### Common options across `scribe`, `herald`, and `scribe-elastic-sync`:
   - `--db_dir` (required) Path of the directory containing lbry-rocksdb, set from the environment with `DB_DIRECTORY`
