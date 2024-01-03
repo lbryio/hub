@@ -9,7 +9,8 @@ SNAPSHOT_URL="${SNAPSHOT_URL:-}" #off by default. latest snapshot at https://lbr
 if [[ "$HUB_COMMAND" == "scribe" ]] && [[ -n "$SNAPSHOT_URL" ]] && [[ ! -d /database/lbry-rocksdb ]]; then
   files="$(ls)"
   echo "Downloading and extracting hub snapshot from $SNAPSHOT_URL"
-  wget --no-verbose -c "$SNAPSHOT_URL" -O - | tar --use-compress-program=unzstd x -C /database
+  #wget --no-verbose -c "$SNAPSHOT_URL" -O - | tar x -C /database
+  curl "$SNAPSHOT_URL" | zstd -d | tar xf - -C /database
 fi
 
 if [ -z "$HUB_COMMAND" ]; then
